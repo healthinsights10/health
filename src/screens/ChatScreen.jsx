@@ -33,10 +33,10 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {WebView} from 'react-native-webview';
 import MessageItem from '../components/MessageItem';
 
-const SOCKET_URL = 'http://192.168.1.18:5000';
-const API_URL = 'http://192.168.1.18:5000';
+const SOCKET_URL = 'http://192.168.1.14:5000';
+const API_URL = 'http://192.168.1.14:5000';
 
-const ChatScreen = () => {
+const ChatScreen = ({route, navigation}) => {
   // Auth context
   const {user, getToken} = useAuth();
   const insets = useSafeAreaInsets();
@@ -101,7 +101,11 @@ const ChatScreen = () => {
 
   // Add this useEffect to fetch contact details when modal opens
   useEffect(() => {
-    if (profileModalVisible && selectedDoctor && !selectedDoctor.isAdminSupport) {
+    if (
+      profileModalVisible &&
+      selectedDoctor &&
+      !selectedDoctor.isAdminSupport
+    ) {
       fetchContactDetails(selectedDoctor.id);
     }
   }, [profileModalVisible, selectedDoctor]);
@@ -114,18 +118,18 @@ const ChatScreen = () => {
   // Add this useEffect to periodically check for new messages
   useEffect(() => {
     if (!selectedDoctor || !socketConnected) return;
-    
+
     // Clean up any existing interval
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current);
     }
-    
+
     // Create polling interval for message updates
     pollIntervalRef.current = setInterval(() => {
       console.log('Polling for new messages...');
       fetchLatestMessages();
     }, 15000); // Poll every 15 seconds
-    
+
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
@@ -284,7 +288,10 @@ const ChatScreen = () => {
 
         // Update the last message timestamp
         const messageTime = new Date(newMessage.timestamp);
-        if (!lastMessageTimestamp || messageTime > new Date(lastMessageTimestamp)) {
+        if (
+          !lastMessageTimestamp ||
+          messageTime > new Date(lastMessageTimestamp)
+        ) {
           setLastMessageTimestamp(newMessage.timestamp);
         }
 
@@ -396,13 +403,16 @@ const ChatScreen = () => {
 
   // Add this after your other useEffect hooks
   useEffect(() => {
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (selectedDoctor) {
-        setSelectedDoctor(null);
-        return true;
-      }
-      return false;
-    });
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (selectedDoctor) {
+          setSelectedDoctor(null);
+          return true;
+        }
+        return false;
+      },
+    );
 
     return () => backHandler.remove();
   }, [selectedDoctor]);
@@ -410,22 +420,26 @@ const ChatScreen = () => {
   // Function to fetch latest messages
   const fetchLatestMessages = async () => {
     if (!selectedDoctor || !user || !currentRoomIdRef.current) return;
-    
+
     try {
       const roomId = currentRoomIdRef.current;
       let url = `${API_URL}/api/messages/${roomId}`;
-      
+
       // Only fetch messages newer than our last message
       if (messages.length > 0 && lastMessageTimestamp) {
         url += `?since=${encodeURIComponent(lastMessageTimestamp)}`;
       }
-      
+
       console.log('Fetching latest messages from:', url);
       const response = await axios.get(url);
-      
-      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+
+      if (
+        response.data &&
+        Array.isArray(response.data) &&
+        response.data.length > 0
+      ) {
         console.log(`Received ${response.data.length} new messages`);
-        
+
         // Transform data to match UI expectations
         const formattedMessages = response.data.map(msg => ({
           id: msg.id,
@@ -442,16 +456,18 @@ const ChatScreen = () => {
           fileType: msg.file_type || msg.fileType,
           fileSize: msg.file_size || msg.fileSize,
         }));
-        
+
         // Update messages state with new messages
         setMessages(prevMessages => {
           // Filter out duplicates
           const existingIds = prevMessages.map(m => m.id);
-          const newMessages = formattedMessages.filter(m => !existingIds.includes(m.id));
-          
+          const newMessages = formattedMessages.filter(
+            m => !existingIds.includes(m.id),
+          );
+
           if (newMessages.length > 0) {
             console.log(`Adding ${newMessages.length} new messages`);
-            
+
             // Update last message timestamp
             if (newMessages.length > 0) {
               const latestMsg = newMessages.reduce((latest, msg) => {
@@ -459,16 +475,16 @@ const ChatScreen = () => {
                 const latestTime = new Date(latest.timestamp);
                 return msgTime > latestTime ? msg : latest;
               }, newMessages[0]);
-              
+
               setLastMessageTimestamp(latestMsg.timestamp);
             }
-            
+
             // Merge and sort by timestamp (most recent first)
-            return [...newMessages, ...prevMessages].sort((a, b) => 
-              new Date(b.timestamp) - new Date(a.timestamp)
+            return [...newMessages, ...prevMessages].sort(
+              (a, b) => new Date(b.timestamp) - new Date(a.timestamp),
             );
           }
-          
+
           return prevMessages;
         });
       }
@@ -478,17 +494,20 @@ const ChatScreen = () => {
   };
 
   // Rest of your component functionality...
-  const fetchContactDetails = async (contactId) => {
+  const fetchContactDetails = async contactId => {
     try {
       setContactDetails(null); // Reset previous details
-      
+
       const token = await getAuthToken();
-      const response = await axios.get(`${API_URL}/api/user-profile/${contactId}`, {
-        headers: {
-          Authorization: token,
+      const response = await axios.get(
+        `${API_URL}/api/user-profile/${contactId}`,
+        {
+          headers: {
+            Authorization: token,
+          },
         },
-      });
-      
+      );
+
       console.log('Contact details received:', response.data);
       setContactDetails(response.data);
     } catch (error) {
@@ -608,7 +627,7 @@ const ChatScreen = () => {
             const latestTime = new Date(latest.timestamp);
             return msgTime > latestTime ? msg : latest;
           }, formattedMessages[0]);
-          
+
           setLastMessageTimestamp(latestMsg.timestamp);
         }
 
@@ -634,44 +653,46 @@ const ChatScreen = () => {
 
   // Search functionality
   const searchUsers = async query => {
-  if (!query.trim() || query.length < 3) {
-    setSearchResults([]);
-    setNoResultsFound(false);
-    return;
-  }
+    if (!query.trim() || query.length < 3) {
+      setSearchResults([]);
+      setNoResultsFound(false);
+      return;
+    }
 
-  try {
-    setSearching(true);
+    try {
+      setSearching(true);
 
-    const token = await getToken();
-    const response = await axios.get(
-      `${API_URL}/api/users/search-users?query=${encodeURIComponent(query.trim())}`,
-      {
-        headers: {
-          Authorization: token ? `Bearer ${token}` : '',
+      const token = await getToken();
+      const response = await axios.get(
+        `${API_URL}/api/users/search-users?query=${encodeURIComponent(
+          query.trim(),
+        )}`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : '',
+          },
         },
-      },
-    );
+      );
 
-    // Filter out current user and include avatar_url in each result
-    const filteredResults = response.data
-      .filter(result => result.id !== user?.id)
-      .map(result => ({
-        ...result,
-        avatar_url: result.avatar_url || null, // Ensure avatar_url is included
-      }));
+      // Filter out current user and include avatar_url in each result
+      const filteredResults = response.data
+        .filter(result => result.id !== user?.id)
+        .map(result => ({
+          ...result,
+          avatar_url: result.avatar_url || null, // Ensure avatar_url is included
+        }));
 
-    console.log('Search results:', filteredResults.length);
-    setSearchResults(filteredResults);
-    setNoResultsFound(filteredResults.length === 0);
-  } catch (error) {
-    console.error('Error searching users:', error);
-    setSearchResults([]);
-    setNoResultsFound(true);
-  } finally {
-    setSearching(false);
-  }
-};
+      console.log('Search results:', filteredResults.length);
+      setSearchResults(filteredResults);
+      setNoResultsFound(filteredResults.length === 0);
+    } catch (error) {
+      console.error('Error searching users:', error);
+      setSearchResults([]);
+      setNoResultsFound(true);
+    } finally {
+      setSearching(false);
+    }
+  };
 
   // Handle search input changes
   const handleSearchChange = text => {
@@ -938,6 +959,14 @@ const ChatScreen = () => {
       room_id: roomId,
       messageType: 'text',
       message_type: 'text',
+
+      // Add notification data for background notifications
+      notification_title: `${user.name}`,
+      notification_body: newMessage.trim().substring(0, 100),
+      send_notification: true,
+      notification_type: 'chat_message',
+      notification_action: 'open_chat',
+      channel_id: 'chat_messages',
     };
 
     // Clear input field immediately
@@ -1123,43 +1152,43 @@ const ChatScreen = () => {
 
   // Fetch recent chats
   const fetchRecentChats = useCallback(async () => {
-  if (!user) return;
+    if (!user) return;
 
-  try {
-    console.log('Fetching recent chats for user:', user.id);
-    const response = await axios.get(`${API_URL}/api/chat-rooms/${user.id}`);
+    try {
+      console.log('Fetching recent chats for user:', user.id);
+      const response = await axios.get(`${API_URL}/api/chat-rooms/${user.id}`);
 
-    if (response.data && Array.isArray(response.data)) {
-      console.log(`Found ${response.data.length} recent chats`);
+      if (response.data && Array.isArray(response.data)) {
+        console.log(`Found ${response.data.length} recent chats`);
 
-      // Transform the chat rooms into a format suitable for display
-      const processedChats = response.data.map(room => {
-        // Determine the other user in the conversation
-        const otherUser = room.user1_id === user.id ? room.user2 : room.user1;
+        // Transform the chat rooms into a format suitable for display
+        const processedChats = response.data.map(room => {
+          // Determine the other user in the conversation
+          const otherUser = room.user1_id === user.id ? room.user2 : room.user1;
 
-        return {
-          id: otherUser?.id || 'unknown',
-          name: otherUser?.name || 'Unknown User',
-          role: otherUser?.role || 'user',
-          avatar_url: otherUser?.avatar_url || null, // Include avatar_url
-          roomId: room.id,
-          lastMessage: room.last_message?.content || null,
-          lastMessageTime:
-            room.last_message?.created_at ||
-            room.updated_at ||
-            room.created_at,
-          unreadCount: room.unread_count || 0,
-          isAdminSupport:
-            otherUser?.role === 'admin' || room.room_id?.startsWith('admin-'),
-        };
-      });
+          return {
+            id: otherUser?.id || 'unknown',
+            name: otherUser?.name || 'Unknown User',
+            role: otherUser?.role || 'user',
+            avatar_url: otherUser?.avatar_url || null, // Include avatar_url
+            roomId: room.id,
+            lastMessage: room.last_message?.content || null,
+            lastMessageTime:
+              room.last_message?.created_at ||
+              room.updated_at ||
+              room.created_at,
+            unreadCount: room.unread_count || 0,
+            isAdminSupport:
+              otherUser?.role === 'admin' || room.room_id?.startsWith('admin-'),
+          };
+        });
 
-      setRecentChats(processedChats);
+        setRecentChats(processedChats);
+      }
+    } catch (error) {
+      console.error('Error fetching recent chats:', error);
     }
-  } catch (error) {
-    console.error('Error fetching recent chats:', error);
-  }
-}, [user?.id]);
+  }, [user?.id]);
 
   // Call fetchRecentChats on initial load and after sending a message
   useEffect(() => {
@@ -1168,53 +1197,57 @@ const ChatScreen = () => {
 
   // UI Components
   const renderDoctor = ({item}) => (
-  <TouchableOpacity
-    style={[
-      styles.doctorItem,
-      selectedDoctor?.id === item.id && styles.selectedDoctor,
-      item.isAdminSupport && styles.adminSupportItem,
-    ]}
-    onPress={() => setSelectedDoctor({
-      ...item,
-      avatar_url: item.avatar_url, // Make sure to pass avatar_url
-    })}>
-    <View
+    <TouchableOpacity
       style={[
-        styles.avatarContainer,
-        item.isAdminSupport && styles.adminAvatarContainer,
-      ]}>
-      {item.isAdminSupport ? (
-        <Icon name="headset" size={26} color="#fff" />
-      ) : item.avatar_url ? (
-        <Image 
-          source={{uri: item.avatar_url}} 
-          style={styles.doctorAvatarImage}
-          onError={() => console.log(`Failed to load avatar for doctor ${item.name}`)}
-        />
-      ) : (
-        <Text style={styles.avatarText}>
-          {item.name ? item.name.charAt(0).toUpperCase() : '?'}
+        styles.doctorItem,
+        selectedDoctor?.id === item.id && styles.selectedDoctor,
+        item.isAdminSupport && styles.adminSupportItem,
+      ]}
+      onPress={() =>
+        setSelectedDoctor({
+          ...item,
+          avatar_url: item.avatar_url, // Make sure to pass avatar_url
+        })
+      }>
+      <View
+        style={[
+          styles.avatarContainer,
+          item.isAdminSupport && styles.adminAvatarContainer,
+        ]}>
+        {item.isAdminSupport ? (
+          <Icon name="headset" size={26} color="#fff" />
+        ) : item.avatar_url ? (
+          <Image
+            source={{uri: item.avatar_url}}
+            style={styles.doctorAvatarImage}
+            onError={() =>
+              console.log(`Failed to load avatar for doctor ${item.name}`)
+            }
+          />
+        ) : (
+          <Text style={styles.avatarText}>
+            {item.name ? item.name.charAt(0).toUpperCase() : '?'}
+          </Text>
+        )}
+      </View>
+      <View style={styles.doctorInfo}>
+        <Text
+          style={[
+            styles.doctorName,
+            selectedDoctor?.id === item.id && styles.selectedDoctorText,
+          ]}>
+          {item.name || 'Unknown'}
         </Text>
-      )}
-    </View>
-    <View style={styles.doctorInfo}>
-      <Text
-        style={[
-          styles.doctorName,
-          selectedDoctor?.id === item.id && styles.selectedDoctorText,
-        ]}>
-        {item.name || 'Unknown'}
-      </Text>
-      <Text
-        style={[
-          styles.doctorSpecialization,
-          selectedDoctor?.id === item.id && styles.selectedDoctorText,
-        ]}>
-        {item.isAdminSupport ? 'Technical Support' : item.degree || 'General'}
-      </Text>
-    </View>
-  </TouchableOpacity>
-);
+        <Text
+          style={[
+            styles.doctorSpecialization,
+            selectedDoctor?.id === item.id && styles.selectedDoctorText,
+          ]}>
+          {item.isAdminSupport ? 'Technical Support' : item.degree || 'General'}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   const renderMessage = ({item, index}) => {
     // Keep date separator logic
@@ -1234,9 +1267,9 @@ const ChatScreen = () => {
       day: 'numeric',
       year: 'numeric',
     });
-    
+
     // Helper function to handle attachment press
-    const handleAttachmentPress = (message) => {
+    const handleAttachmentPress = message => {
       // Reuse the existing openPreview function
       openPreview(message);
     };
@@ -1255,122 +1288,132 @@ const ChatScreen = () => {
       file_name: item.fileName || item.file_name,
       file_type: item.fileType || item.file_type,
       file_size: item.fileSize || item.file_size,
-      pending: item.pending || false
+      pending: item.pending || false,
     };
 
     return (
       <>
-      <MessageItem 
-        message={normalizedMessage}
-        currentUserId={user?.id}
-        onAttachmentPress={handleAttachmentPress}
-      />
-      
-      {showDateSeparator && (
-        <View style={styles.dateSeparator}>
-          <View style={styles.line} />
-          <Text style={styles.dateSeparatorText}>{formattedDate}</Text>
-          <View style={styles.line} />
-        </View>
-      )}
+        <MessageItem
+          message={normalizedMessage}
+          currentUserId={user?.id}
+          onAttachmentPress={handleAttachmentPress}
+        />
+
+        {showDateSeparator && (
+          <View style={styles.dateSeparator}>
+            <View style={styles.line} />
+            <Text style={styles.dateSeparatorText}>{formattedDate}</Text>
+            <View style={styles.line} />
+          </View>
+        )}
       </>
     );
   };
-const renderChatHeader = () => {
-  if (!selectedDoctor) return null;
+  const renderChatHeader = () => {
+    if (!selectedDoctor) return null;
 
-  return (
-    <View style={styles.chatHeader}>
-      <TouchableOpacity
-        style={styles.headerBackButton}
-        onPress={() => setSelectedDoctor(null)}>
-        <Icon name="arrow-left" size={24} color="#333" />
-      </TouchableOpacity>
+    return (
+      <View style={styles.chatHeader}>
+        <TouchableOpacity
+          style={styles.headerBackButton}
+          onPress={() => setSelectedDoctor(null)}>
+          <Icon name="arrow-left" size={24} color="#333" />
+        </TouchableOpacity>
 
-      {/* Updated Avatar Container */}
+        {/* Updated Avatar Container */}
+        <View style={styles.avatarContainer}>
+          {selectedDoctor.isAdminSupport ? (
+            // Admin support shows headset icon
+            <Icon name="headset" size={26} color="#fff" />
+          ) : selectedDoctor.avatar_url ? (
+            // Doctor with profile picture
+            <Image
+              source={{uri: selectedDoctor.avatar_url}}
+              style={styles.headerAvatarImage}
+              onError={e => {
+                console.log(
+                  'Failed to load header avatar:',
+                  e.nativeEvent.error,
+                );
+              }}
+            />
+          ) : (
+            // Fallback to initials
+            <Text style={styles.avatarText}>
+              {selectedDoctor.name
+                ? selectedDoctor.name.charAt(0).toUpperCase()
+                : '?'}
+            </Text>
+          )}
+        </View>
+
+        {/* Make the title container clickable */}
+        <TouchableOpacity
+          style={styles.headerTitleContainer}
+          onPress={() => setProfileModalVisible(true)}>
+          <Text style={styles.headerTitle}>{selectedDoctor.name}</Text>
+          <Text style={styles.headerSubtitle}>
+            {socketConnected ? 'online' : 'offline'}
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.headerButton} onPress={toggleSearch}>
+            <Icon name="magnify" size={22} color="#666" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerButton}>
+            <Icon name="dots-vertical" size={22} color="#666" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const renderUserSearchResult = ({item}) => (
+    <TouchableOpacity
+      style={styles.searchResultItem}
+      onPress={() => {
+        setSelectedDoctor({
+          ...item,
+          avatar_url: item.avatar_url, // Make sure avatar_url is included
+        });
+        setSearchVisible(false);
+        setSearchQuery('');
+      }}>
+      {/* Search Result Profile Picture */}
       <View style={styles.avatarContainer}>
-        {selectedDoctor.isAdminSupport ? (
-          // Admin support shows headset icon
-          <Icon name="headset" size={26} color="#fff" />
-        ) : selectedDoctor.avatar_url ? (
-          // Doctor with profile picture
-          <Image 
-            source={{ uri: selectedDoctor.avatar_url }} 
-            style={styles.headerAvatarImage}
-            onError={(e) => {
-              console.log('Failed to load header avatar:', e.nativeEvent.error);
-            }}
+        {item.avatar_url ? (
+          <Image
+            source={{uri: item.avatar_url}}
+            style={styles.searchResultAvatarImage}
+            onError={() =>
+              console.log(
+                `Failed to load search result avatar for ${item.name}`,
+              )
+            }
           />
         ) : (
-          // Fallback to initials
           <Text style={styles.avatarText}>
-            {selectedDoctor.name ? selectedDoctor.name.charAt(0).toUpperCase() : '?'}
+            {item.name ? item.name.charAt(0).toUpperCase() : '?'}
           </Text>
         )}
       </View>
 
-      {/* Make the title container clickable */}
-      <TouchableOpacity 
-        style={styles.headerTitleContainer}
-        onPress={() => setProfileModalVisible(true)}>
-        <Text style={styles.headerTitle}>{selectedDoctor.name}</Text>
-        <Text style={styles.headerSubtitle}>
-          {socketConnected ? 'online' : 'offline'}
+      <View style={styles.searchResultInfo}>
+        <Text style={styles.searchResultName}>
+          {item.name || 'Unnamed User'}
         </Text>
-      </TouchableOpacity>
-
-      <View style={styles.headerActions}>
-        <TouchableOpacity style={styles.headerButton} onPress={toggleSearch}>
-          <Icon name="magnify" size={22} color="#666" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.headerButton}>
-          <Icon name="dots-vertical" size={22} color="#666" />
-        </TouchableOpacity>
+        <Text style={styles.searchResultDetail}>
+          {item.degree && (
+            <Text style={styles.degreeText}>{item.degree} • </Text>
+          )}
+          {item.email || item.phone || 'No contact info'}
+        </Text>
       </View>
-    </View>
+
+      <Icon name="message-text-outline" size={20} color="#2e7af5" />
+    </TouchableOpacity>
   );
-};
-
-  const renderUserSearchResult = ({item}) => (
-  <TouchableOpacity
-    style={styles.searchResultItem}
-    onPress={() => {
-      setSelectedDoctor({
-        ...item,
-        avatar_url: item.avatar_url, // Make sure avatar_url is included
-      });
-      setSearchVisible(false);
-      setSearchQuery('');
-    }}>
-    
-    {/* Search Result Profile Picture */}
-    <View style={styles.avatarContainer}>
-      {item.avatar_url ? (
-        <Image 
-          source={{uri: item.avatar_url}} 
-          style={styles.searchResultAvatarImage}
-          onError={() => console.log(`Failed to load search result avatar for ${item.name}`)}
-        />
-      ) : (
-        <Text style={styles.avatarText}>
-          {item.name ? item.name.charAt(0).toUpperCase() : '?'}
-        </Text>
-      )}
-    </View>
-
-    <View style={styles.searchResultInfo}>
-      <Text style={styles.searchResultName}>
-        {item.name || 'Unnamed User'}
-      </Text>
-      <Text style={styles.searchResultDetail}>
-        {item.degree && <Text style={styles.degreeText}>{item.degree} • </Text>}
-        {item.email || item.phone || 'No contact info'}
-      </Text>
-    </View>
-
-    <Icon name="message-text-outline" size={20} color="#2e7af5" />
-  </TouchableOpacity>
-);
 
   const renderSearchInterface = () => (
     <View style={styles.searchInterfaceContainer}>
@@ -1454,66 +1497,68 @@ const renderChatHeader = () => {
   );
 
   // Add a new render function for recent chats
- const renderRecentChat = ({item}) => {
-  const isAdminChat = item.isAdminSupport;
+  const renderRecentChat = ({item}) => {
+    const isAdminChat = item.isAdminSupport;
 
-  return (
-    <TouchableOpacity
-      style={styles.recentChatItem}
-      onPress={() =>
-        setSelectedDoctor({
-          id: item.id,
-          name: item.name,
-          role: item.role,
-          isAdminSupport: isAdminChat,
-          avatar_url: item.avatar_url, // Include avatar_url
-        })
-      }>
-      <View
-        style={[
-          styles.avatarContainer,
-          isAdminChat && styles.adminAvatarContainer,
-        ]}>
-        {isAdminChat ? (
-          <Icon name="headset" size={26} color="#fff" />
-        ) : item.avatar_url ? (
-          <Image 
-            source={{uri: item.avatar_url}} 
-            style={styles.recentChatAvatarImage}
-            onError={() => console.log(`Failed to load avatar for ${item.name}`)}
-          />
-        ) : (
-          <Text style={styles.avatarText}>
-            {item.name ? item.name.charAt(0).toUpperCase() : '?'}
-          </Text>
-        )}
-      </View>
-
-      <View style={styles.chatInfo}>
-        <View style={styles.chatTopRow}>
-          <Text style={styles.chatName}>{item.name}</Text>
-          {item.lastMessageTime && (
-            <Text style={styles.chatTime}>
-              {formatChatTime(new Date(item.lastMessageTime))}
+    return (
+      <TouchableOpacity
+        style={styles.recentChatItem}
+        onPress={() =>
+          setSelectedDoctor({
+            id: item.id,
+            name: item.name,
+            role: item.role,
+            isAdminSupport: isAdminChat,
+            avatar_url: item.avatar_url, // Include avatar_url
+          })
+        }>
+        <View
+          style={[
+            styles.avatarContainer,
+            isAdminChat && styles.adminAvatarContainer,
+          ]}>
+          {isAdminChat ? (
+            <Icon name="headset" size={26} color="#fff" />
+          ) : item.avatar_url ? (
+            <Image
+              source={{uri: item.avatar_url}}
+              style={styles.recentChatAvatarImage}
+              onError={() =>
+                console.log(`Failed to load avatar for ${item.name}`)
+              }
+            />
+          ) : (
+            <Text style={styles.avatarText}>
+              {item.name ? item.name.charAt(0).toUpperCase() : '?'}
             </Text>
           )}
         </View>
 
-        {item.lastMessage && (
-          <Text style={styles.chatPreview} numberOfLines={1}>
-            {item.lastMessage}
-          </Text>
-        )}
-      </View>
+        <View style={styles.chatInfo}>
+          <View style={styles.chatTopRow}>
+            <Text style={styles.chatName}>{item.name}</Text>
+            {item.lastMessageTime && (
+              <Text style={styles.chatTime}>
+                {formatChatTime(new Date(item.lastMessageTime))}
+              </Text>
+            )}
+          </View>
 
-      {item.unreadCount > 0 && (
-        <View style={styles.unreadBadge}>
-          <Text style={styles.unreadCount}>{item.unreadCount}</Text>
+          {item.lastMessage && (
+            <Text style={styles.chatPreview} numberOfLines={1}>
+              {item.lastMessage}
+            </Text>
+          )}
         </View>
-      )}
-    </TouchableOpacity>
-  );
-};
+
+        {item.unreadCount > 0 && (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadCount}>{item.unreadCount}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   // Helper function to format chat times
   const formatChatTime = date => {
@@ -1580,7 +1625,7 @@ const renderChatHeader = () => {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
-                colors={["#2e7af5"]}
+                colors={['#2e7af5']}
                 tintColor="#2e7af5"
               />
             }
@@ -1709,23 +1754,29 @@ const renderChatHeader = () => {
                       <View style={styles.profileAvatarLarge}>
                         {contactDetails.avatar_url ? (
                           <Image
-                            source={{ uri: contactDetails.avatar_url }}
+                            source={{uri: contactDetails.avatar_url}}
                             style={styles.profileAvatarImage}
                           />
                         ) : (
                           <Text style={styles.profileAvatarText}>
-                            {contactDetails.name ? contactDetails.name.charAt(0) : '?'}
+                            {contactDetails.name
+                              ? contactDetails.name.charAt(0)
+                              : '?'}
                           </Text>
                         )}
                       </View>
-                      
-                      <Text style={styles.profileName}>{contactDetails.name}</Text>
-                      
+
+                      <Text style={styles.profileName}>
+                        {contactDetails.name}
+                      </Text>
+
                       <View style={styles.profileRoleBadge}>
                         <Text style={styles.profileRoleText}>
-                          {contactDetails.role === 'doctor' ? 'Healthcare Professional' : 
-                           contactDetails.role === 'pharma' ? 'Pharmaceutical Rep' : 
-                           contactDetails.role}
+                          {contactDetails.role === 'doctor'
+                            ? 'Healthcare Professional'
+                            : contactDetails.role === 'pharma'
+                            ? 'Pharmaceutical Rep'
+                            : contactDetails.role}
                         </Text>
                       </View>
 
@@ -1733,13 +1784,23 @@ const renderChatHeader = () => {
                       <View style={styles.verificationContainer}>
                         {contactDetails.verified ? (
                           <View style={styles.verifiedBadge}>
-                            <Icon name="check-decagram" size={16} color="#4CAF50" />
+                            <Icon
+                              name="check-decagram"
+                              size={16}
+                              color="#4CAF50"
+                            />
                             <Text style={styles.verifiedText}>Verified</Text>
                           </View>
                         ) : (
                           <View style={styles.unverifiedBadge}>
-                            <Icon name="clock-outline" size={16} color="#FF9800" />
-                            <Text style={styles.unverifiedText}>Pending Verification</Text>
+                            <Icon
+                              name="clock-outline"
+                              size={16}
+                              color="#FF9800"
+                            />
+                            <Text style={styles.unverifiedText}>
+                              Pending Verification
+                            </Text>
                           </View>
                         )}
                       </View>
