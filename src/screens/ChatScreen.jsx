@@ -1415,43 +1415,48 @@ const ChatScreen = ({route, navigation}) => {
     </TouchableOpacity>
   );
 
-  const renderSearchInterface = () => (
-    <View style={styles.searchInterfaceContainer}>
-      <Text style={styles.searchTitle}>Connect Here!</Text>
-      <Text style={styles.searchSubtitle}>
-        Search for a doctor by email or phone to start a conversation
-      </Text>
+  // Update the renderSearchInterface function with these changes:
 
-      <View style={styles.searchBarContainer}>
-        <Icon name="magnify" size={20} color="#666" style={styles.searchIcon} />
-        <TextInput
-          ref={searchInputRef}
-          style={styles.searchBarInput}
-          placeholder="Search by email or phone number"
-          value={searchQuery}
-          onChangeText={handleSearchChange}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity
-            onPress={() => {
-              setSearchQuery('');
-              setSearchResults([]);
-              setNoResultsFound(false);
-            }}
-            style={styles.clearButton}>
-            <Icon name="close-circle" size={18} color="#888" />
-          </TouchableOpacity>
-        )}
+const renderSearchInterface = () => (
+  <View style={styles.searchInterfaceContainer}>
+    <Text style={styles.searchTitle}>Connect Here!</Text>
+    <Text style={styles.searchSubtitle}>
+      Search for a doctor by email or phone to start a conversation
+    </Text>
+
+    <View style={styles.searchBarContainer}>
+      <Icon name="magnify" size={20} color="#666" style={styles.searchIcon} />
+      <TextInput
+        ref={searchInputRef}
+        style={styles.searchBarInput}
+        placeholder="Search by email or phone number"
+        placeholderTextColor="#999999" 
+        value={searchQuery}
+        onChangeText={handleSearchChange}
+        autoCapitalize="none"
+        keyboardType="email-address"
+      />
+      {searchQuery.length > 0 && (
+        <TouchableOpacity
+          onPress={() => {
+            setSearchQuery('');
+            setSearchResults([]);
+            setNoResultsFound(false);
+          }}
+          style={styles.clearButton}>
+          <Icon name="close-circle" size={18} color="#888" />
+        </TouchableOpacity>
+      )}
+    </View>
+
+    {searching ? (
+      <View style={styles.searchStatusContainer}>
+        <ActivityIndicator size="small" color="#2e7af5" />
+        <Text style={styles.searchingText}>Searching...</Text>
       </View>
-
-      {searching ? (
-        <View style={styles.searchStatusContainer}>
-          <ActivityIndicator size="small" color="#2e7af5" />
-          <Text style={styles.searchingText}>Searching...</Text>
-        </View>
-      ) : noResultsFound ? (
+    ) : searchQuery.length > 0 ? (
+      // Show search results only when there's a search query
+      noResultsFound ? (
         <View style={styles.searchStatusContainer}>
           <Icon name="account-search-outline" size={40} color="#ccc" />
           <Text style={styles.noResultsText}>No matching users found</Text>
@@ -1459,10 +1464,21 @@ const ChatScreen = ({route, navigation}) => {
             Try a different email address or phone number
           </Text>
         </View>
-      ) : null}
-
-      {/* Show recent chats section if available */}
-      {recentChats.length > 0 && !searchQuery && (
+      ) : searchResults.length > 0 ? (
+        // Display search results when available
+        <View style={styles.searchResultsSection}>
+          <Text style={styles.resultsHeader}>Search Results</Text>
+          <FlatList
+            data={searchResults}
+            renderItem={renderUserSearchResult}
+            keyExtractor={item => item.id}
+            style={styles.searchResultsList}
+          />
+        </View>
+      ) : null
+    ) : (
+      // Show recent chats only when not searching
+      recentChats.length > 0 && (
         <>
           <Text style={styles.recentChatsHeader}>Recent Conversations</Text>
           <FlatList
@@ -1472,9 +1488,11 @@ const ChatScreen = ({route, navigation}) => {
             style={styles.recentChatsList}
           />
         </>
-      )}
+      )
+    )}
 
-      {/* Admin support option */}
+    {/* Only show admin support option when not actively searching */}
+    {!searchQuery.length > 0 && (
       <View style={styles.adminSupportContainer}>
         <Text style={styles.orDivider}>OR</Text>
         <TouchableOpacity
@@ -1493,8 +1511,9 @@ const ChatScreen = ({route, navigation}) => {
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
-  );
+    )}
+  </View>
+);
 
   // Add a new render function for recent chats
   const renderRecentChat = ({item}) => {
@@ -2717,6 +2736,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 16,
   },
+searchResultsSection: {
+  flex: 1,
+  marginTop: 8,
+  marginBottom: 16,
+},
   searchingText: {
     marginLeft: 8,
     fontSize: 16,
