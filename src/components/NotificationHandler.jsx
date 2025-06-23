@@ -42,8 +42,23 @@ const NotificationHandler = () => {
         break;
 
       case 'chat_message':
-        if (action === 'open_chat' && id) {
-          navigation.navigate('ChatScreen', {userId: id});
+        if (action === 'open_chat') {
+          // Handle different possible formats of sender/user ID
+          const userId = id || data?.sender_id || data?.senderId || data?.user_id;
+          const roomId = data?.room_id || data?.roomId;
+          
+          console.log('Chat notification received:', { userId, roomId, data });
+          
+          if (userId) {
+            // Navigate to ChatScreen with the sender's ID and notification flag
+            navigation.navigate('ChatScreen', {
+              userId: userId,
+              roomId: roomId,
+              openFromNotification: true,
+              // Also pass the sender details if available
+              senderName: data?.sender_name || data?.senderName,
+            });
+          }
         }
         break;
 

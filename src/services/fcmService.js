@@ -162,6 +162,49 @@ class FCMService {
       this.messageListener();
     }
   }
+
+  // Add this method to your FCMService class
+  async verifyTokenRegistration() {
+    try {
+      // Get the stored token
+      const fcmToken = await AsyncStorage.getItem('fcmToken');
+      if (!fcmToken) {
+        console.log('⚠️ No FCM token stored locally');
+        return {success: false, error: 'No FCM token stored'};
+      }
+
+      console.log(
+        '📱 Found local FCM token:',
+        fcmToken.substring(0, 15) + '...',
+      );
+
+      // Check if user is logged in
+      const authToken = await AsyncStorage.getItem('@token');
+      if (!authToken) {
+        console.log('⚠️ User not logged in, cannot verify token with server');
+        return {success: false, error: 'User not logged in'};
+      }
+
+      // Verify token with server
+      const API_URL = 'http://192.168.1.14:5000'; // Adjust as needed
+      const response = await fetch(`${API_URL}/api/verify-fcm-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: authToken,
+        },
+        body: JSON.stringify({fcmToken}),
+      });
+
+      const result = await response.json();
+      console.log('🔍 FCM token verification result:', result);
+
+      return result;
+    } catch (error) {
+      console.error('❌ Error verifying FCM token:', error);
+      return {success: false, error: error.message};
+    }
+  }
 }
 
 export const fcmService = new FCMService();

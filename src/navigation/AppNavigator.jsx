@@ -47,6 +47,7 @@ import AddCourseVideoScreen from '../screens/AddCourseVideoScreen';
 import AdminChatScreen from '../screens/admin/AdminChatScreen';
 import NotificationHandler from '../components/NotificationHandler';
 import SponsorshipRequestsScreen from '../screens/SponsorshipRequestsScreen';
+import FCMDebugScreen from '../screens/FCMDebugScreen';
 
 const Stack = createStackNavigator();
 const AdminStack = createStackNavigator();
@@ -103,6 +104,14 @@ const AdminNavigator = () => {
         name="AdminChat"
         component={AdminChatScreen}
         options={{headerShown: false}}
+      />
+      <Stack.Screen
+        name="FCMDebug"
+        component={FCMDebugScreen}
+        options={{
+          headerShown: true,
+          title: 'Notification Debugger',
+        }}
       />
     </AdminStack.Navigator>
   );
@@ -206,6 +215,14 @@ const AppNavigator = () => {
               name="SponsorshipRequests"
               component={SponsorshipRequestsScreen}
               options={{headerShown: false}}
+            />
+            <Stack.Screen
+              name="FCMDebug"
+              component={FCMDebugScreen}
+              options={{
+                headerShown: true,
+                title: 'Notification Debugger',
+              }}
             />
           </>
         )
