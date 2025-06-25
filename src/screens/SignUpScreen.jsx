@@ -225,7 +225,7 @@ const SignUpScreen = ({navigation}) => {
       return;
     }
 
-    // Make document upload required for both doctor and pharma
+    // Make document upload required for doctors
     if (role === 'doctor' && documents.length === 0) {
       Alert.alert(
         'Error',
@@ -237,13 +237,63 @@ const SignUpScreen = ({navigation}) => {
     try {
       setIsSubmitting(true);
 
-      // Create user data object based on role
+      // First, prepare and upload the documents to get their URLs
+      let documentData = [];
+
+      if (documents.length > 0) {
+        // Show a loading message
+        Alert.alert('Processing', 'Uploading your documents. Please wait...', [
+          {text: 'OK'},
+        ]);
+
+        // Upload documents to temporary storage first
+        // This requires a new endpoint on your server that doesn't require authentication
+        for (const doc of documents) {
+          const formData = new FormData();
+
+          formData.append('document', {
+            uri:
+              Platform.OS === 'ios' ? doc.uri.replace('file://', '') : doc.uri,
+            type: doc.type || 'application/octet-stream',
+            name: doc.name || `file-${Date.now()}.${doc.uri.split('.').pop()}`,
+          });
+
+          const response = await fetch(
+            `${api.defaults.baseURL}/uploads/temp-document`,
+            {
+              method: 'POST',
+              body: formData,
+            },
+          );
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(
+              `Document upload failed: ${response.status} ${errorText}`,
+            );
+          }
+
+          const result = await response.json();
+
+          documentData.push({
+            name: doc.name,
+            type: doc.type,
+            size: doc.size,
+            url: result.url,
+            storage_path: result.storage_path,
+          });
+        }
+      }
+
+      // Create user data object including document info
       const userData = {
         name,
         email,
         password,
         role,
         phone,
+        // Include uploaded documents data in the signup request
+        documents: documentData,
       };
 
       // Add role-specific fields
@@ -251,51 +301,28 @@ const SignUpScreen = ({navigation}) => {
         userData.degree = degree;
       } else if (role === 'pharma') {
         userData.company = company;
-        userData.roleInCompany = roleInCompany; // Use the correct field name
+        userData.roleInCompany = roleInCompany;
       }
 
-      // Debug log
-      console.log('Sending user data for registration:', userData);
+      console.log('Sending user data for registration:', {
+        ...userData,
+        documents: `${documentData.length} documents`,
+      });
 
-      // Register the user
+      // Register the user with documents included
       await signup(userData);
 
-      // Now handle the document upload if needed - SAME HANDLING FOR BOTH ROLES
-      if ((role === 'doctor' || role === 'pharma') && documents.length > 0) {
-        // Show an intermediate message
-        Alert.alert(
-          'Account Created',
-          'Your account has been created successfully! Now uploading your documents for verification.',
-          [{text: 'OK'}],
-        );
-
-        try {
-          // Login first to get a valid token
-          await login(email, password);
-
-          // Now upload the documents with valid authentication
-          const uploadedDocuments = await handleUploadDocuments();
-
-          if (uploadedDocuments.length > 0) {
-            // Update user profile with documents
-            await userService.uploadDocuments(uploadedDocuments);
-
-            Alert.alert(
-              'Registration Complete',
-              'Your account and documents have been submitted. An admin will review your documents for verification.',
-              [{text: 'Continue'}],
-            );
-          }
-        } catch (uploadError) {
-          console.error('Document upload error:', uploadError);
-          Alert.alert(
-            'Document Upload Failed',
-            "Your account was created but we couldn't upload your documents. " +
-              'You can upload them later from your profile.',
-            [{text: 'OK'}],
-          );
-        }
-      }
+      // Show success message with instructions to verify email
+      Alert.alert(
+        'Registration Complete!',
+        'Your account has been created and your documents have been submitted. Please check your email to verify your account before logging in.',
+        [
+          {
+            text: 'Go to Login',
+            onPress: () => navigation.replace('Login'),
+          },
+        ],
+      );
     } catch (error) {
       console.error('Signup error:', error);
       Alert.alert('Signup Failed', error.message || 'Please try again later');
