@@ -344,6 +344,15 @@ const AdminEventDetails = ({route, navigation}) => {
               <Icon name="delete" size={18} color="#fff" />
               <Text style={styles.adminButtonText}>Delete</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.adminButton, {backgroundColor: '#9c27b0'}]}
+              onPress={() => navigation.navigate('AdminQuiz', { 
+                eventId: eventId, 
+                eventTitle: event.title 
+              })}>
+              <Icon name="help-circle" size={18} color="#fff" />
+              <Text style={styles.adminButtonText}>Manage Quiz</Text>
+            </TouchableOpacity>
           </View>
         </View>
 

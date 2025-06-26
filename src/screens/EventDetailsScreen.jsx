@@ -355,6 +355,19 @@ const EventDetailsScreen = ({route, navigation}) => {
                 <Icon name="calendar-plus" size={18} color="#2e7af5" />
                 <Text style={styles.secondaryButtonText}>Add to Calendar</Text>
               </TouchableOpacity>
+
+              {/* Add this button in the action buttons section */}
+              <TouchableOpacity
+                style={[styles.secondaryButton, {backgroundColor: '#e8f5e9'}]}
+                onPress={() => navigation.navigate('Quiz', { 
+                  eventId: event.id, 
+                  eventTitle: event.title 
+                })}>
+                <Icon name="help-circle" size={18} color="#4caf50" />
+                <Text style={[styles.secondaryButtonText, {color: '#4caf50'}]}>
+                  Take Quiz
+                </Text>
+              </TouchableOpacity>
             </>
           )}
         </View>

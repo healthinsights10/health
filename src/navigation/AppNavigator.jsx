@@ -48,6 +48,8 @@ import AdminChatScreen from '../screens/admin/AdminChatScreen';
 import NotificationHandler from '../components/NotificationHandler';
 import SponsorshipRequestsScreen from '../screens/SponsorshipRequestsScreen';
 import FCMDebugScreen from '../screens/FCMDebugScreen';
+import QuizScreen from '../screens/QuizScreen';
+import AdminQuizScreen from '../screens/admin/AdminQuizScreen';
 
 const Stack = createStackNavigator();
 const AdminStack = createStackNavigator();
@@ -111,6 +113,14 @@ const AdminNavigator = () => {
         options={{
           headerShown: true,
           title: 'Notification Debugger',
+        }}
+      />
+      <AdminStack.Screen
+        name="AdminQuiz"
+        component={AdminQuizScreen}
+        options={{
+          headerShown: true,
+          title: 'Manage Quiz',
         }}
       />
     </AdminStack.Navigator>
@@ -222,6 +232,13 @@ const AppNavigator = () => {
               options={{
                 headerShown: true,
                 title: 'Notification Debugger',
+              }}
+            />
+            <Stack.Screen
+              name="Quiz"
+              component={QuizScreen}
+              options={{
+                headerShown: false,
               }}
             />
           </>

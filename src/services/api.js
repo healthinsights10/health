@@ -1155,4 +1155,42 @@ export const courseService = {
   },
 };
 
+// Add these methods to your existing exports
+export const quizService = {
+  // Fetch quiz for an event
+  fetchQuiz: async (eventId) => {
+    try {
+      const response = await api.get(`/quiz/${eventId}`);
+      return response.data;
+    } catch (error) {
+      if (error.response && error.response.status === 404) {
+        return null; // No quiz found
+      }
+      console.error('Error fetching quiz:', error);
+      throw error;
+    }
+  },
+
+  // Add quiz (admin only)
+  addQuiz: async (eventId, quizData) => {
+    try {
+      const response = await api.post(`/quiz/add/${eventId}`, quizData);
+      return response.data;
+    } catch (error) {
+      console.error('Error adding quiz:', error);
+      throw error;
+    }
+  },
+
+  // Submit quiz answers
+  submitQuiz: async (eventId, submissionData) => {
+    try {
+      const response = await api.post(`/quiz/submit/${eventId}`, submissionData);
+      return response.data;
+    } catch (error) {
+      console.error('Error submitting quiz:', error);
+      throw error;
+    }
+  }
+};
 export default api;
