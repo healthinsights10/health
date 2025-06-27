@@ -2,7 +2,7 @@ import messaging from '@react-native-firebase/messaging';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Platform} from 'react-native';
 
-const API_URL = 'https://health-server-bw3x.onrender.com/api';
+const API_URL = 'http://192.168.1.8:5000/api';
 
 class FCMService {
   async registerAppWithFCM() {
@@ -186,7 +186,7 @@ class FCMService {
       }
 
       // Verify token with server
-      const API_URL = 'https://health-server-bw3x.onrender.com'; // Adjust as needed
+      const API_URL = 'http://192.168.1.8:5000'; // Adjust as needed
       const response = await fetch(`${API_URL}/api/verify-fcm-token`, {
         method: 'POST',
         headers: {

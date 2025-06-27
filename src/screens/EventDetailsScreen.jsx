@@ -307,17 +307,6 @@ const EventDetailsScreen = ({route, navigation}) => {
             // Show Edit and Delete buttons for event creator
             <>
               <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={() => navigation.navigate('EditEvent', {eventId})}>
-                <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                  <Icon name="pencil" size={18} color="#fff" />
-                  <Text style={[styles.primaryButtonText, {marginLeft: 6}]}>
-                    Edit Event
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
                 style={[styles.secondaryButton, {backgroundColor: '#ffebee'}]}
                 onPress={handleDeleteEvent}>
                 <Icon name="delete" size={18} color="#d32f2f" />

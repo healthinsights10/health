@@ -504,7 +504,7 @@ const HomeScreen = ({navigation}) => {
           <View style={[styles.card, styles.widerCard]}>
             <View style={styles.cardHeader}>
               <Ionicons name="calendar-outline" size={24} color={'#ffffff'} />
-              <Text style={styles.cardTitle}>Meetings This Week</Text>
+              <Text style={styles.cardTitle}>Events This Week</Text>
             </View>
             <Text style={styles.statNumber}>{stats.meetingsThisWeek}</Text>
             <Text style={styles.statSubtext}>

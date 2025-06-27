@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   SafeAreaView,
+  TextInput,
 } from 'react-native';
 import {courseService} from '../services/api';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -18,14 +19,18 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 const CoursesScreen = ({navigation}) => {
   const {user} = useAuth();
   const [courses, setCourses] = useState([]);
+  const [filteredCourses, setFilteredCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const insets = useSafeAreaInsets();
+
   const fetchCourses = async () => {
     try {
       setLoading(true);
       const data = await courseService.getAllCourses();
       setCourses(data);
+      setFilteredCourses(data);
     } catch (error) {
       console.error('Error fetching courses:', error);
       Alert.alert('Error', 'Failed to load courses. Please try again.');
@@ -40,6 +45,21 @@ const CoursesScreen = ({navigation}) => {
     fetchCourses();
   };
 
+  const handleSearch = query => {
+    setSearchQuery(query);
+    if (query.trim() === '') {
+      setFilteredCourses(courses);
+    } else {
+      const filtered = courses.filter(course =>
+        course.title.toLowerCase().includes(query.toLowerCase()) ||
+        course.description?.toLowerCase().includes(query.toLowerCase()) ||
+        course.creator_name?.toLowerCase().includes(query.toLowerCase()) ||
+        course.category?.toLowerCase().includes(query.toLowerCase()),
+      );
+      setFilteredCourses(filtered);
+    }
+  };
+
   useEffect(() => {
     fetchCourses();
 
@@ -49,6 +69,11 @@ const CoursesScreen = ({navigation}) => {
 
     return unsubscribe;
   }, [navigation]);
+
+  // Update filtered courses when courses change
+  useEffect(() => {
+    handleSearch(searchQuery);
+  }, [courses]);
 
   const renderCourseItem = ({item}) => {
     return (
@@ -83,6 +108,38 @@ const CoursesScreen = ({navigation}) => {
     );
   };
 
+  const renderEmptyState = () => {
+    if (searchQuery.trim() !== '' && filteredCourses.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Icon name="magnify-remove-outline" size={60} color="#cccccc" />
+          <Text style={styles.emptyText}>
+            No courses found for "{searchQuery}"
+          </Text>
+          <TouchableOpacity
+            style={styles.clearSearchButton}
+            onPress={() => handleSearch('')}>
+            <Text style={styles.clearSearchText}>Clear Search</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.emptyContainer}>
+        <Icon name="school-outline" size={60} color="#cccccc" />
+        <Text style={styles.emptyText}>No courses available</Text>
+        {(user?.role === 'admin' || user?.role === 'doctor') && (
+          <TouchableOpacity
+            style={styles.createButton}
+            onPress={() => navigation.navigate('CreateCourse')}>
+            <Text style={styles.createButtonText}>Create A Course</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.container, {paddingTop: insets.top}]}>
       <View style={styles.header}>
@@ -96,14 +153,41 @@ const CoursesScreen = ({navigation}) => {
         )}
       </View>
 
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputContainer}>
+          <Icon
+            name="magnify"
+            size={20}
+            color="#999"
+            style={styles.searchIcon}
+          />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search courses by name, description, or creator..."
+            placeholderTextColor="#999"
+            value={searchQuery}
+            onChangeText={handleSearch}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => handleSearch('')}
+              style={styles.clearButton}>
+              <Icon name="close" size={20} color="#999" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2e7af5" />
           <Text style={styles.loadingText}>Loading courses...</Text>
         </View>
-      ) : courses.length > 0 ? (
+      ) : filteredCourses.length > 0 ? (
         <FlatList
-          data={courses}
+          data={filteredCourses}
           renderItem={renderCourseItem}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.coursesList}
@@ -111,17 +195,7 @@ const CoursesScreen = ({navigation}) => {
           onRefresh={onRefresh}
         />
       ) : (
-        <View style={styles.emptyContainer}>
-          <Icon name="school-outline" size={60} color="#cccccc" />
-          <Text style={styles.emptyText}>No courses available</Text>
-          {(user?.role === 'admin' || user?.role === 'doctor') && (
-            <TouchableOpacity
-              style={styles.createButton}
-              onPress={() => navigation.navigate('CreateCourse')}>
-              <Text style={styles.createButtonText}>Create A Course</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        renderEmptyState()
       )}
     </SafeAreaView>
   );
@@ -152,6 +226,33 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  searchContainer: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e1e1e1',
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e6eff7',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    paddingVertical: 4,
+  },
+  clearButton: {
+    padding: 4,
   },
   loadingContainer: {
     flex: 1,
@@ -226,6 +327,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 16,
     marginBottom: 24,
+    textAlign: 'center',
   },
   createButton: {
     backgroundColor: '#2e7af5',
@@ -237,6 +339,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  clearSearchButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#2e7af5',
+  },
+  clearSearchText: {
+    color: '#2e7af5',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

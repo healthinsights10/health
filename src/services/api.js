@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Base URL for API calls
-const API_URL = 'https://health-server-bw3x.onrender.com/api';
+const API_URL = 'http://192.168.1.8:5000/api';
 
 // Create axios instance with better configuration
 const api = axios.create({
@@ -1028,12 +1028,18 @@ export const courseService = {
   },
 
   // Delete course
-  deleteCourse: async courseId => {
+  deleteCourse: async (courseId) => {
     try {
+      console.log('Deleting course:', courseId);
       const response = await api.delete(`/courses/${courseId}`);
+      console.log('Course deletion response:', response.data);
       return response.data;
     } catch (error) {
       console.error('Delete course error:', error);
+      if (error.response) {
+        console.error('Error response:', error.response.data);
+        console.error('Error status:', error.response.status);
+      }
       throw error;
     }
   },

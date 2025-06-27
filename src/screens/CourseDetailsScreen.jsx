@@ -11,6 +11,7 @@ import {
   FlatList,
   SafeAreaView,
   Dimensions,
+  BackHandler, // Add this import
 } from 'react-native';
 import {courseService} from '../services/api';
 import Video from 'react-native-video';
@@ -35,6 +36,16 @@ const CourseDetailsScreen = ({route, navigation}) => {
   const [initialVideoId, setInitialVideoId] = useState(null);
   const [focusComment, setFocusComment] = useState(null);
 
+  // Add useEffect to handle hardware back button
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleBackNavigation();
+      return true; // Prevent default back action
+    });
+
+    return () => backHandler.remove();
+  }, []);
+
   useEffect(() => {
     fetchCourseDetails();
 
@@ -51,6 +62,24 @@ const CourseDetailsScreen = ({route, navigation}) => {
       setFocusComment(focusComment);
     }
   }, [courseId]);
+
+  // Add this function to handle back navigation
+  const handleBackNavigation = () => {
+    // Check if we can go back to Courses screen
+    const navigationState = navigation.getState();
+    const routeNames = navigationState.routes.map(route => route.name);
+    
+    // If Courses screen exists in the stack, navigate to it
+    if (routeNames.includes('Courses')) {
+      navigation.navigate('Courses');
+    } else {
+      // Otherwise, reset navigation to Courses
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Courses' }],
+      });
+    }
+  };
 
   const fetchCourseDetails = async () => {
     try {
@@ -92,31 +121,44 @@ const CourseDetailsScreen = ({route, navigation}) => {
   };
 
   const handleDeleteCourse = async () => {
-    Alert.alert(
-      'Delete Course',
-      'Are you sure you want to delete this course? This action cannot be undone.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          onPress: async () => {
-            try {
-              await courseService.deleteCourse(courseId);
-              Alert.alert('Success', 'Course deleted successfully');
-              navigation.goBack();
-            } catch (error) {
-              console.error('Error deleting course:', error);
-              Alert.alert('Error', 'Failed to delete course');
+  Alert.alert(
+    'Delete Course',
+    'Are you sure you want to delete this course? This action cannot be undone.',
+    [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Delete',
+        onPress: async () => {
+          try {
+            console.log('Starting course deletion process...');
+            await courseService.deleteCourse(courseId);
+            console.log('Course deleted successfully');
+            
+            Alert.alert('Success', 'Course deleted successfully', [
+              {
+                text: 'OK',
+                onPress: () => handleBackNavigation()
+              }
+            ]);
+          } catch (error) {
+            console.error('Error deleting course:', error);
+            
+            let errorMessage = 'Failed to delete course';
+            if (error.response && error.response.data && error.response.data.message) {
+              errorMessage = error.response.data.message;
             }
-          },
-          style: 'destructive',
+            
+            Alert.alert('Error', errorMessage);
+          }
         },
-      ],
-    );
-  };
+        style: 'destructive',
+      },
+    ],
+  );
+};
 
   const handleSelectVideo = video => {
     console.log('Selecting video:', {
@@ -196,7 +238,7 @@ const CourseDetailsScreen = ({route, navigation}) => {
         <Text style={styles.errorText}>Course not found</Text>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}>
+          onPress={handleBackNavigation}> {/* Update this */}
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
       </SafeAreaView>
@@ -213,7 +255,7 @@ const CourseDetailsScreen = ({route, navigation}) => {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}>
+          onPress={handleBackNavigation}> {/* Update this */}
           <Icon name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
@@ -237,6 +279,7 @@ const CourseDetailsScreen = ({route, navigation}) => {
         )}
       </View>
 
+      {/* Rest of your component remains the same */}
       <ScrollView style={styles.content}>
         {selectedVideo ? (
           <View style={styles.videoContainer}>
@@ -510,8 +553,6 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
-
-  // Enhanced Video Card Styles
   videoCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -599,8 +640,6 @@ const styles = StyleSheet.create({
   videoCardSeparator: {
     height: 8,
   },
-
-  // Old video item styles (kept for compatibility)
   videoItem: {
     padding: 12,
     borderRadius: 8,
@@ -621,7 +660,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
   },
-
   noVideosContainer: {
     alignItems: 'center',
     padding: 40,
