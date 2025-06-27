@@ -1157,7 +1157,7 @@ export const courseService = {
 
 // Add these methods to your existing exports
 export const quizService = {
-  // Fetch quiz for an event
+  // Fetch quiz for an event (updated to include attempts)
   fetchQuiz: async (eventId) => {
     try {
       const response = await api.get(`/quiz/${eventId}`);
@@ -1182,13 +1182,24 @@ export const quizService = {
     }
   },
 
-  // Submit quiz answers
+  // Submit quiz answers (updated)
   submitQuiz: async (eventId, submissionData) => {
     try {
       const response = await api.post(`/quiz/submit/${eventId}`, submissionData);
       return response.data;
     } catch (error) {
       console.error('Error submitting quiz:', error);
+      throw error;
+    }
+  },
+
+  // Get quiz results
+  getQuizResults: async (eventId) => {
+    try {
+      const response = await api.get(`/quiz/${eventId}/results`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching quiz results:', error);
       throw error;
     }
   }

@@ -562,7 +562,7 @@ const HomeScreen = ({navigation}) => {
                 styles.tabText,
                 activeTab === 'participated' && styles.activeTabText,
               ]}>
-              Participated Events
+              Registered Events
             </Text>
           </TouchableOpacity>
         </View>
