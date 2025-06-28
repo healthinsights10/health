@@ -361,7 +361,7 @@ const ChatScreen = ({route, navigation}) => {
       });
 
       socketRef.current.on('connect_error', error => {
-        console.error('Socket connection error:', error);
+        //console.error('Socket connection error:', error);
         setSocketConnected(false);
 
         // Implement retry logic with backoff
@@ -1799,30 +1799,6 @@ const renderSearchInterface = () => (
                         </Text>
                       </View>
 
-                      {/* Verification Status */}
-                      <View style={styles.verificationContainer}>
-                        {contactDetails.verified ? (
-                          <View style={styles.verifiedBadge}>
-                            <Icon
-                              name="check-decagram"
-                              size={16}
-                              color="#4CAF50"
-                            />
-                            <Text style={styles.verifiedText}>Verified</Text>
-                          </View>
-                        ) : (
-                          <View style={styles.unverifiedBadge}>
-                            <Icon
-                              name="clock-outline"
-                              size={16}
-                              color="#FF9800"
-                            />
-                            <Text style={styles.unverifiedText}>
-                              Pending Verification
-                            </Text>
-                          </View>
-                        )}
-                      </View>
                     </View>
 
                     {/* Contact Information Section */}
@@ -1878,155 +1854,8 @@ const renderSearchInterface = () => (
                             </View>
                           </View>
                         )}
-
-                        {/* Medical License/Registration Info */}
-                        <View style={styles.profileInfoItem}>
-                          <Icon
-                            name="card-account-details-outline"
-                            size={20}
-                            color="#666"
-                          />
-                          <View style={styles.profileInfoContent}>
-                            <Text style={styles.profileInfoLabel}>
-                              Documents Uploaded
-                            </Text>
-                            <Text style={styles.profileInfoText}>
-                              {contactDetails.totalDocuments || 0} documents
-                              {contactDetails.verifiedDocuments > 0 &&
-                                ` (${contactDetails.verifiedDocuments} verified)`}
-                            </Text>
-                          </View>
-                        </View>
-
-                        {/* Email Verification Status */}
-                        <View style={styles.profileInfoItem}>
-                          <Icon
-                            name="email-check-outline"
-                            size={20}
-                            color="#666"
-                          />
-                          <View style={styles.profileInfoContent}>
-                            <Text style={styles.profileInfoLabel}>
-                              Email Status
-                            </Text>
-                            <Text
-                              style={[
-                                styles.profileInfoText,
-                                contactDetails.email_verified
-                                  ? styles.verifiedTextGreen
-                                  : styles.unverifiedTextOrange,
-                              ]}>
-                              {contactDetails.email_verified
-                                ? 'Verified'
-                                : 'Unverified'}
-                            </Text>
-                          </View>
-                        </View>
                       </View>
                     )}
-
-                    {/* Company Information Section - Enhanced for Pharma */}
-                    {contactDetails.role === 'pharma' && (
-                      <View style={styles.profileSection}>
-                        <Text style={styles.profileSectionTitle}>
-                          Company Information
-                        </Text>
-
-                        {contactDetails.company && (
-                          <View style={styles.profileInfoItem}>
-                            <Icon name="domain" size={20} color="#666" />
-                            <View style={styles.profileInfoContent}>
-                              <Text style={styles.profileInfoLabel}>
-                                Company
-                              </Text>
-                              <Text style={styles.profileInfoText}>
-                                {contactDetails.company}
-                              </Text>
-                            </View>
-                          </View>
-                        )}
-
-                        {contactDetails.role_in_company && (
-                          <View style={styles.profileInfoItem}>
-                            <Icon
-                              name="briefcase-outline"
-                              size={20}
-                              color="#666"
-                            />
-                            <View style={styles.profileInfoContent}>
-                              <Text style={styles.profileInfoLabel}>
-                                Position
-                              </Text>
-                              <Text style={styles.profileInfoText}>
-                                {contactDetails.role_in_company}
-                              </Text>
-                            </View>
-                          </View>
-                        )}
-
-                        {/* Company Documents Info */}
-                        <View style={styles.profileInfoItem}>
-                          <Icon
-                            name="file-document-multiple-outline"
-                            size={20}
-                            color="#666"
-                          />
-                          <View style={styles.profileInfoContent}>
-                            <Text style={styles.profileInfoLabel}>
-                              Company Documents
-                            </Text>
-                            <Text style={styles.profileInfoText}>
-                              {contactDetails.totalDocuments || 0} documents
-                              uploaded
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    )}
-
-                    {/* Achievements Section - Enhanced */}
-                    {contactDetails.achievements &&
-                      contactDetails.achievements.length > 0 && (
-                        <View style={styles.profileSection}>
-                          <Text style={styles.profileSectionTitle}>
-                            Achievements & Certifications
-                          </Text>
-
-                          {contactDetails.achievements.map(
-                            (achievement, index) => (
-                              <View key={index} style={styles.achievementItem}>
-                                <Icon
-                                  name="trophy-outline"
-                                  size={20}
-                                  color="#E6A817"
-                                />
-                                <View style={styles.achievementContent}>
-                                  {achievement.title && (
-                                    <Text style={styles.achievementTitle}>
-                                      {achievement.title}
-                                    </Text>
-                                  )}
-                                  {achievement.description && (
-                                    <Text style={styles.achievementDescription}>
-                                      {achievement.description}
-                                    </Text>
-                                  )}
-                                  {achievement.year && (
-                                    <Text style={styles.achievementYear}>
-                                      Year: {achievement.year}
-                                    </Text>
-                                  )}
-                                  {achievement.institution && (
-                                    <Text style={styles.achievementInstitution}>
-                                      Institution: {achievement.institution}
-                                    </Text>
-                                  )}
-                                </View>
-                              </View>
-                            ),
-                          )}
-                        </View>
-                      )}
 
                     {/* Account Information Section - Enhanced */}
                     <View style={styles.profileSection}>
@@ -2049,102 +1878,6 @@ const renderSearchInterface = () => (
                               day: 'numeric',
                             })}
                           </Text>
-                        </View>
-                      </View>
-
-                      <View style={styles.profileInfoItem}>
-                        <Icon name="update" size={20} color="#666" />
-                        <View style={styles.profileInfoContent}>
-                          <Text style={styles.profileInfoLabel}>
-                            Last Updated
-                          </Text>
-                          <Text style={styles.profileInfoText}>
-                            {new Date(
-                              contactDetails.updated_at,
-                            ).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                            })}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* Overall Verification Status */}
-                      <View style={styles.profileInfoItem}>
-                        <Icon
-                          name="shield-check-outline"
-                          size={20}
-                          color="#666"
-                        />
-                        <View style={styles.profileInfoContent}>
-                          <Text style={styles.profileInfoLabel}>
-                            Verification Status
-                          </Text>
-                          <View style={styles.verificationStatusContainer}>
-                            {contactDetails.verified ? (
-                              <View style={styles.statusBadgeGreen}>
-                                <Icon name="check" size={14} color="#fff" />
-                                <Text style={styles.statusBadgeText}>
-                                  Fully Verified
-                                </Text>
-                              </View>
-                            ) : (
-                              <View style={styles.statusBadgeOrange}>
-                                <Icon name="clock" size={14} color="#fff" />
-                                <Text style={styles.statusBadgeText}>
-                                  Under Review
-                                </Text>
-                              </View>
-                            )}
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-
-                    {/* Quick Stats Section */}
-                    <View style={styles.profileSection}>
-                      <Text style={styles.profileSectionTitle}>
-                        Quick Stats
-                      </Text>
-
-                      <View style={styles.statsContainer}>
-                        <View style={styles.statItem}>
-                          <Icon
-                            name="file-document-outline"
-                            size={24}
-                            color="#2e7af5"
-                          />
-                          <Text style={styles.statNumber}>
-                            {contactDetails.totalDocuments || 0}
-                          </Text>
-                          <Text style={styles.statLabel}>Documents</Text>
-                        </View>
-
-                        <View style={styles.statItem}>
-                          <Icon
-                            name="check-circle-outline"
-                            size={24}
-                            color="#4CAF50"
-                          />
-                          <Text style={styles.statNumber}>
-                            {contactDetails.verifiedDocuments || 0}
-                          </Text>
-                          <Text style={styles.statLabel}>Verified</Text>
-                        </View>
-
-                        <View style={styles.statItem}>
-                          <Icon
-                            name="trophy-outline"
-                            size={24}
-                            color="#E6A817"
-                          />
-                          <Text style={styles.statNumber}>
-                            {(contactDetails.achievements &&
-                              contactDetails.achievements.length) ||
-                              0}
-                          </Text>
-                          <Text style={styles.statLabel}>Achievements</Text>
                         </View>
                       </View>
                     </View>

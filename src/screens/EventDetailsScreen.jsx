@@ -340,20 +340,16 @@ const EventDetailsScreen = ({route, navigation}) => {
                     <Text style={styles.primaryButtonText}> Register Now</Text>
                   </TouchableOpacity>
                 ))}
-              <TouchableOpacity style={styles.secondaryButton}>
-                <Icon name="calendar-plus" size={18} color="#2e7af5" />
-                <Text style={styles.secondaryButtonText}>Add to Calendar</Text>
-              </TouchableOpacity>
 
               {/* Add this button in the action buttons section */}
               <TouchableOpacity
-                style={[styles.secondaryButton, {backgroundColor: '#e8f5e9'}]}
+                style={[styles.secondaryButton, {backgroundColor: '#ff85be'}]}
                 onPress={() => navigation.navigate('Quiz', { 
                   eventId: event.id, 
                   eventTitle: event.title 
                 })}>
-                <Icon name="help-circle" size={18} color="#4caf50" />
-                <Text style={[styles.secondaryButtonText, {color: '#4caf50'}]}>
+                <Icon name="help-circle" size={18} color="#fff" />
+                <Text style={[styles.secondaryButtonText, {color: '#fff'}]}>
                   Take Quiz
                 </Text>
               </TouchableOpacity>
@@ -695,7 +691,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eee',
   },
   primaryButton: {
-    backgroundColor: '#e36135',
+    backgroundColor: '#2e7af5',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,

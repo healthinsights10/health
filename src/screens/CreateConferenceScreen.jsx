@@ -70,6 +70,11 @@ const CreateConferenceScreen = ({navigation}) => {
   const [selectedPharmaIds, setSelectedPharmaIds] = useState([]);
   const [loadingPharma, setLoadingPharma] = useState(false);
 
+  // Add these new state variables for search functionality
+  const [sponsorSearchQuery, setSponsorSearchQuery] = useState('');
+  const [filteredPharmaCompanies, setFilteredPharmaCompanies] = useState([]);
+  const [showSponsorDropdown, setShowSponsorDropdown] = useState(false);
+
   const formatDate = date => {
     return `${date.getFullYear()}-${(date.getMonth() + 1)
       .toString()
@@ -193,6 +198,45 @@ const CreateConferenceScreen = ({navigation}) => {
     } else {
       setSelectedPharmaIds([...selectedPharmaIds, pharmaId]);
     }
+  };
+
+  // Update the pharma companies search functionality
+  const handleSponsorSearch = query => {
+    setSponsorSearchQuery(query);
+    if (query.trim() === '') {
+      setFilteredPharmaCompanies([]);
+      setShowSponsorDropdown(false);
+    } else {
+      const filtered = pharmaCompanies.filter(pharma =>
+        (pharma.company || pharma.name)
+          .toLowerCase()
+          .includes(query.toLowerCase()),
+      );
+      setFilteredPharmaCompanies(filtered);
+      setShowSponsorDropdown(true);
+    }
+  };
+
+  // Function to add a selected sponsor
+  const addSelectedSponsor = pharma => {
+    // Check if already added
+    if (selectedPharmaIds.includes(pharma.id)) {
+      Alert.alert('Already Added', 'This sponsor has already been added.');
+      return;
+    }
+
+    // Add to selected sponsors
+    setSelectedPharmaIds([...selectedPharmaIds, pharma.id]);
+
+    // Clear search
+    setSponsorSearchQuery('');
+    setFilteredPharmaCompanies([]);
+    setShowSponsorDropdown(false);
+  };
+
+  // Function to remove a selected sponsor
+  const removeSelectedSponsor = pharmaId => {
+    setSelectedPharmaIds(selectedPharmaIds.filter(id => id !== pharmaId));
   };
 
   const handleCreateConference = async () => {
@@ -631,62 +675,113 @@ const CreateConferenceScreen = ({navigation}) => {
           {/* Sponsors Section */}
           <Text style={styles.sectionTitle}>Sponsors</Text>
 
-          {/* Manual Sponsor Addition */}
-          {/* <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Sponsor Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter sponsor name"
-              placeholderTextColor={'#999'}
-              value={newSponsorName}
-              onChangeText={setNewSponsorName}
-            />
-          </View>
+          {/* Sponsor Search */}
+          <View style={[styles.inputGroup, ]}>
+            {/* Search Input */}
+            <View style={styles.searchContainer}>
+              <View style={styles.searchInputContainer}>
+                <Icon name="magnify" size={20} color="#666" style={styles.searchIcon} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Add pharmaceutical companies by search"
+                  placeholderTextColor="#999"
+                  value={sponsorSearchQuery}
+                  onChangeText={handleSponsorSearch}
+                  onFocus={() => sponsorSearchQuery && setShowSponsorDropdown(true)}
+                />
+                {sponsorSearchQuery.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSponsorSearchQuery('');
+                      setFilteredPharmaCompanies([]);
+                      setShowSponsorDropdown(false);
+                    }}
+                    style={styles.clearSearchButton}>
+                    <Icon name="close" size={20} color="#999" />
+                  </TouchableOpacity>
+                )}
+              </View>
 
-          <TouchableOpacity style={styles.addButton} onPress={addSponsor}>
-            <Icon name="plus" size={20} color="white" />
-            <Text style={styles.addButtonText}>Add Manual Sponsor</Text>
-          </TouchableOpacity> */}
+              {/* Search Results Dropdown */}
+              {showSponsorDropdown && filteredPharmaCompanies.length > 0 && (
+                <View style={styles.searchDropdown}>
+                  {filteredPharmaCompanies.map((pharma) => (
+                    <TouchableOpacity
+                      key={pharma.id}
+                      style={[
+                        styles.searchResultItem,
+                        selectedPharmaIds.includes(pharma.id) && styles.searchResultItemSelected
+                      ]}
+                      onPress={() => addSelectedSponsor(pharma)}
+                      disabled={selectedPharmaIds.includes(pharma.id)}
+                    >
+                      <View style={styles.searchResultContent}>
+                        <Text style={[
+                          styles.searchResultText,
+                          selectedPharmaIds.includes(pharma.id) && styles.searchResultTextSelected
+                        ]}>
+                          {pharma.company || pharma.name}
+                        </Text>
+                        {selectedPharmaIds.includes(pharma.id) && (
+                          <Icon name="check-circle" size={20} color="#4caf50" />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
 
-          {/* Pharma Companies as Sponsors */}
-          <View style={[styles.inputGroup, {marginTop: 20}]}>
-            <Text style={styles.inputLabel}>
-              Invite Pharmaceutical Companies as Sponsors
-            </Text>
-            <Text style={styles.inputDescription}>
-              Selected companies will receive a sponsorship request for this
-              event
-            </Text>
+              {/* No Results Message */}
+              {showSponsorDropdown && filteredPharmaCompanies.length === 0 && sponsorSearchQuery.trim() !== '' && (
+                <View style={styles.noResultsContainer}>
+                  <Text style={styles.noResultsText}>
+                    No pharmaceutical companies found matching "{sponsorSearchQuery}"
+                  </Text>
+                </View>
+              )}
+            </View>
 
-            {loadingPharma ? (
+            {/* Loading State */}
+            {loadingPharma && (
               <ActivityIndicator
                 size="small"
                 color="#2e7af5"
                 style={{marginVertical: 10}}
               />
-            ) : pharmaCompanies.length === 0 ? (
-              <Text style={styles.noPharmaText}>
-                No pharmaceutical companies available
-              </Text>
-            ) : (
-              <View style={styles.pharmaList}>
-                {pharmaCompanies.map(pharma => (
-                  <View key={pharma.id} style={styles.pharmaItem}>
-                    <CheckBox
-                      value={selectedPharmaIds.includes(pharma.id)}
-                      onValueChange={() => togglePharmaSelection(pharma.id)}
-                      tintColors={{true: '#2e7af5', false: '#666'}}
-                    />
-                    <Text style={styles.pharmaName}>
-                      {pharma.company || pharma.name}
-                    </Text>
-                  </View>
-                ))}
-              </View>
             )}
           </View>
 
-          {/* Current Sponsors List */}
+          {/* Selected Sponsors Display */}
+          {selectedPharmaIds.length > 0 && (
+            <View style={styles.selectedSponsorsContainer}>
+              <Text style={styles.selectedSponsorsTitle}>
+                Selected Sponsors ({selectedPharmaIds.length})
+              </Text>
+              
+              <View style={styles.selectedSponsorsList}>
+                {selectedPharmaIds.map(id => {
+                  const pharma = pharmaCompanies.find(p => p.id === id);
+                  if (!pharma) return null;
+                  
+                  return (
+                    <View key={id} style={styles.selectedSponsorChip}>
+                      <Text style={styles.selectedSponsorName}>
+                        {pharma.company || pharma.name}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => removeSelectedSponsor(id)}
+                        style={styles.removeSponsorButton}
+                      >
+                        <Icon name="close" size={16} color="#666" />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* Current Manual Sponsors List (keep existing manual sponsor functionality) */}
           {sponsors.length > 0 && (
             <View style={styles.listContainer}>
               <Text style={styles.sponsorListTitle}>
@@ -698,27 +793,6 @@ const CreateConferenceScreen = ({navigation}) => {
                 keyExtractor={item => item.id}
                 scrollEnabled={false}
               />
-            </View>
-          )}
-
-          {selectedPharmaIds.length > 0 && (
-            <View style={styles.selectedPharmaContainer}>
-              <Text style={styles.sponsorListTitle}>
-                Selected Pharmaceutical Companies:
-              </Text>
-              {selectedPharmaIds.map(id => {
-                const pharma = pharmaCompanies.find(p => p.id === id);
-                return (
-                  <View key={id} style={styles.selectedPharmaItem}>
-                    <Icon name="check-circle" size={16} color="#4caf50" />
-                    <Text style={styles.selectedPharmaName}>
-                      {pharma
-                        ? pharma.company || pharma.name
-                        : 'Unknown Company'}
-                    </Text>
-                  </View>
-                );
-              })}
             </View>
           )}
 
@@ -1100,6 +1174,107 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     marginLeft: 8,
+  },
+  searchContainer: {
+    width: '100%',
+    position: 'relative',
+  },
+  searchInputContainer: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+  },
+  clearSearchButton: {
+    padding: 8,
+  },
+  searchDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    zIndex: 1000,
+  },
+  searchResultItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  searchResultItemSelected: {
+    backgroundColor: '#e8f0fe',
+  },
+  searchResultContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  searchResultText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  searchResultTextSelected: {
+    fontWeight: '500',
+    color: '#2e7af5',
+  },
+  noResultsContainer: {
+    padding: 12,
+    alignItems: 'center',
+  },
+  noResultsText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  selectedSponsorsContainer: {
+    marginTop: 16,
+    backgroundColor: '#f9f9f9',
+    padding: 12,
+    borderRadius: 8,
+  },
+  selectedSponsorsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+  },
+  selectedSponsorsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  selectedSponsorChip: {
+    backgroundColor: '#e1f5fe',
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  selectedSponsorName: {
+    fontSize: 14,
+    color: '#333',
+    marginRight: 8,
+  },
+  removeSponsorButton: {
+    padding: 4,
   },
 });
 

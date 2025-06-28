@@ -66,6 +66,13 @@ const HomeScreen = ({navigation}) => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('my'); // 'my', 'ongoing', 'recommended'
 
+  // Add state for all events categories for unified calendar
+  const [allEventsData, setAllEventsData] = useState({
+    myEvents: [],
+    ongoingEvents: [],
+    registeredEvents: []
+  });
+
   // Add state for stats
   const [stats, setStats] = useState({
     upcomingEvents: 0,
@@ -168,6 +175,46 @@ const HomeScreen = ({navigation}) => {
     });
   };
 
+  // Add new function to fetch all events data for unified calendar
+  const fetchAllEventsData = async () => {
+    try {
+      const [myEventsData, ongoingEventsData, registeredEventsData] = await Promise.all([
+        eventService.getMyEvents(),
+        eventService.getOngoingEvents(),
+        eventService.getRegisteredEvents()
+      ]);
+
+      // Add brochure info for each category
+      const processEvents = async (eventsArray) => {
+        return await Promise.all(
+          eventsArray.map(async event => {
+            try {
+              const brochureData = await eventService.getEventBrochure(event.id);
+              return {...event, brochure: brochureData};
+            } catch (error) {
+              return event;
+            }
+          }),
+        );
+      };
+
+      const [myEventsWithBrochures, ongoingEventsWithBrochures, registeredEventsWithBrochures] = await Promise.all([
+        processEvents(myEventsData),
+        processEvents(ongoingEventsData),
+        processEvents(registeredEventsData)
+      ]);
+
+      setAllEventsData({
+        myEvents: myEventsWithBrochures,
+        ongoingEvents: ongoingEventsWithBrochures,
+        registeredEvents: registeredEventsWithBrochures
+      });
+
+    } catch (error) {
+      console.error('Failed to load all events data:', error);
+    }
+  };
+
   // Update the fetchEvents function to filter ongoing events for today only
   const fetchEvents = async () => {
     try {
@@ -238,25 +285,27 @@ const HomeScreen = ({navigation}) => {
     }
   };
 
-  // Update useEffect to fetch registered events
+  // Update useEffect to fetch registered events and all events data
   useEffect(() => {
     fetchEvents();
     fetchRegisteredEvents();
-    if (user) fetchProfileImage(); // Add this line
+    fetchAllEventsData(); // Add this line
+    if (user) fetchProfileImage();
 
     const unsubscribe = navigation.addListener('focus', () => {
       fetchEvents();
       fetchRegisteredEvents();
-      if (user) fetchProfileImage(); // Add this line
+      fetchAllEventsData(); // Add this line
+      if (user) fetchProfileImage();
     });
 
     return unsubscribe;
   }, [navigation, activeTab]);
 
-  // Update onRefresh to include registered events
+  // Update onRefresh to include all events data
   const onRefresh = () => {
     setRefreshing(true);
-    Promise.all([fetchEvents(), fetchRegisteredEvents()]); // Update this
+    Promise.all([fetchEvents(), fetchRegisteredEvents(), fetchAllEventsData()]);
   };
 
   // Format date function (reused from MyEventsScreen)
@@ -373,74 +422,93 @@ const HomeScreen = ({navigation}) => {
     }
   }, [searchTerm, events]);
 
-  // Add this function before the return statement
-  // Replace the existing generateMarkedDates function with this improved version
-  const generateMarkedDates = eventsData => {
+  // Updated function to generate unified marked dates with different colors
+  const generateUnifiedMarkedDates = (allEvents) => {
     const marks = {};
 
-    eventsData.forEach(event => {
-      // Skip if no start or end date
-      if (!event.startDate || !event.endDate) return;
+    // Define colors for each category
+    const colors = {
+      myEvents: '#2e7af5',      // Blue for my events
+      ongoingEvents: '#4CAF50',  // Green for ongoing events
+      registeredEvents: '#FF9800' // Orange for registered events
+    };
 
-      // Parse dates carefully to avoid timezone issues
-      const startParts = event.startDate.split('T')[0].split('-');
-      const endParts = event.endDate.split('T')[0].split('-');
+    // Process each category
+    Object.keys(allEvents).forEach(category => {
+      const eventsArray = allEvents[category];
+      const color = colors[category];
 
-      // Create dates using year, month, day to avoid timezone shifts
-      // Note: months are 0-indexed in JavaScript Date
-      const start = new Date(
-        parseInt(startParts[0]),
-        parseInt(startParts[1]) - 1,
-        parseInt(startParts[2]),
-      );
+      eventsArray.forEach(event => {
+        if (!event.startDate || !event.endDate) return;
 
-      const end = new Date(
-        parseInt(endParts[0]),
-        parseInt(endParts[1]) - 1,
-        parseInt(endParts[2]),
-      );
+        // Parse dates carefully to avoid timezone issues
+        const startParts = event.startDate.split('T')[0].split('-');
+        const endParts = event.endDate.split('T')[0].split('-');
 
-      // Generate all dates in the range
-      const currentDate = new Date(start);
-      while (currentDate <= end) {
-        // Format: YYYY-MM-DD
-        const year = currentDate.getFullYear();
-        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-        const day = String(currentDate.getDate()).padStart(2, '0');
-        const dateString = `${year}-${month}-${day}`;
+        const start = new Date(
+          parseInt(startParts[0]),
+          parseInt(startParts[1]) - 1,
+          parseInt(startParts[2]),
+        );
 
-        // Add each date to the marked dates
-        marks[dateString] = {
-          selected: true,
-          selectedColor: '#FFA500', // Light orange color
-        };
+        const end = new Date(
+          parseInt(endParts[0]),
+          parseInt(endParts[1]) - 1,
+          parseInt(endParts[2]),
+        );
 
-        // Move to next day
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
+        // Generate all dates in the range
+        const currentDate = new Date(start);
+        while (currentDate <= end) {
+          const year = currentDate.getFullYear();
+          const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+          const day = String(currentDate.getDate()).padStart(2, '0');
+          const dateString = `${year}-${month}-${day}`;
+
+          // If date already exists, create multi-color dots
+          if (marks[dateString]) {
+            // Add to existing dots array
+            if (!marks[dateString].dots) {
+              marks[dateString].dots = [{color: marks[dateString].selectedColor}];
+            }
+            // Check if this color already exists
+            const colorExists = marks[dateString].dots.some(dot => dot.color === color);
+            if (!colorExists) {
+              marks[dateString].dots.push({color});
+            }
+            // Remove selectedColor property when using dots
+            delete marks[dateString].selectedColor;
+            delete marks[dateString].selected;
+          } else {
+            // First event for this date
+            marks[dateString] = {
+              selected: true,
+              selectedColor: color,
+            };
+          }
+
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+      });
     });
-
-    // For debugging
-    console.log('Marked dates:', Object.keys(marks));
 
     return marks;
   };
 
-  // Add this useEffect
+  // Update the useEffect for marked dates to use unified data
   useEffect(() => {
-    if (events && events.length > 0) {
+    if (allEventsData.myEvents.length > 0 || allEventsData.ongoingEvents.length > 0 || allEventsData.registeredEvents.length > 0) {
       try {
-        const marks = generateMarkedDates(events);
+        const marks = generateUnifiedMarkedDates(allEventsData);
         setMarkedDates(marks);
       } catch (error) {
-        console.error('Error generating marked dates:', error);
-        // Fallback to empty object if there's an error
+        console.error('Error generating unified marked dates:', error);
         setMarkedDates({});
       }
     } else {
       setMarkedDates({});
     }
-  }, [events]);
+  }, [allEventsData]);
 
   return (
     <SafeAreaView style={[styles.container, {paddingTop: insets.top}]}>
@@ -515,16 +583,6 @@ const HomeScreen = ({navigation}) => {
                 : 'No upcoming meetings'}
             </Text>
           </View>
-
-          {/* Available CME Courses Card */}
-          {/* <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Icon name="book-open-variant" size={24} color="#ffffff" />
-              <Text style={styles.cardTitle}>Available Courses</Text>
-            </View>
-            <Text style={styles.statNumber}>24</Text>
-            <Text style={styles.statSubtext}>5 new courses added</Text>
-          </View> */}
         </View>
 
         {/* Events Tabs */}
@@ -650,12 +708,12 @@ const HomeScreen = ({navigation}) => {
         </View>
       </ScrollView>
 
-      {/* Calendar Overlay */}
+      {/* Calendar Overlay with Updated Legend */}
       {showCalendar && (
         <View style={styles.calendarOverlay}>
           <View style={styles.calendarContainer}>
             <View style={styles.calendarHeader}>
-              <Text style={styles.calendarTitle}>Event Calendar</Text>
+              <Text style={styles.calendarTitle}>Unified Event Calendar</Text>
               <TouchableOpacity onPress={() => setShowCalendar(false)}>
                 <Icon name="close" size={24} color="#333" />
               </TouchableOpacity>
@@ -669,12 +727,12 @@ const HomeScreen = ({navigation}) => {
                 backgroundColor: '#ffffff',
                 calendarBackground: '#ffffff',
                 textSectionTitleColor: '#2e7af5',
-                selectedDayBackgroundColor: '#FFA500',
+                selectedDayBackgroundColor: '#2e7af5',
                 selectedDayTextColor: '#ffffff',
                 todayTextColor: '#2e7af5',
                 dayTextColor: '#333',
                 textDisabledColor: '#d9e1e8',
-                dotColor: '#FFA500',
+                dotColor: '#2e7af5',
                 selectedDotColor: '#ffffff',
                 arrowColor: '#2e7af5',
                 monthTextColor: '#333',
@@ -683,8 +741,16 @@ const HomeScreen = ({navigation}) => {
 
             <View style={styles.calendarLegend}>
               <View style={styles.legendItem}>
-                <View style={styles.legendDot} />
-                <Text style={styles.legendText}>Event Dates</Text>
+                <View style={[styles.legendDot, {backgroundColor: '#2e7af5'}]} />
+                <Text style={styles.legendText}>My Events       </Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, {backgroundColor: '#4CAF50'}]} />
+                <Text style={styles.legendText}>Ongoing Events    </Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, {backgroundColor: '#FF9800'}]} />
+                <Text style={styles.legendText}>Registered Events </Text>
               </View>
             </View>
           </View>
