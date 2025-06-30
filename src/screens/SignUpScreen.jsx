@@ -15,11 +15,12 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {useAuth} from '../context/AuthContext';
 import * as ImagePicker from 'react-native-image-picker';
 import RNFS from 'react-native-fs';
-// Import the WebView document picker
 import WebViewDocumentPicker from '../components/WebViewDocumentPicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import api, {userService} from '../services/api';
+import {api} from '../services/api';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+
+const API_BASE_URL = 'http://192.168.1.10:5000/api';
 
 const SignUpScreen = ({navigation}) => {
   const [step, setStep] = useState(1);
@@ -158,17 +159,14 @@ const SignUpScreen = ({navigation}) => {
         });
 
         // Upload to our server endpoint
-        const response = await fetch(
-          `${api.defaults.baseURL}/uploads/document`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              // Don't set Content-Type for multipart/form-data
-            },
-            body: formData,
+        const response = await fetch(`${API_BASE_URL}/uploads/document`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            // Don't set Content-Type for multipart/form-data
           },
-        );
+          body: formData,
+        });
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -251,7 +249,6 @@ const SignUpScreen = ({navigation}) => {
         ]);
 
         // Upload documents to temporary storage first
-        // This requires a new endpoint on your server that doesn't require authentication
         for (const doc of documents) {
           const formData = new FormData();
 
@@ -262,8 +259,9 @@ const SignUpScreen = ({navigation}) => {
             name: doc.name || `file-${Date.now()}.${doc.uri.split('.').pop()}`,
           });
 
+          // Use the constant instead of api.defaults.baseURL
           const response = await fetch(
-            `${api.defaults.baseURL}/uploads/temp-document`,
+            `${API_BASE_URL}/uploads/temp-document`,
             {
               method: 'POST',
               body: formData,
