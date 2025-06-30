@@ -70,7 +70,7 @@ const HomeScreen = ({navigation}) => {
   const [allEventsData, setAllEventsData] = useState({
     myEvents: [],
     ongoingEvents: [],
-    registeredEvents: []
+    registeredEvents: [],
   });
 
   // Add state for stats
@@ -90,6 +90,10 @@ const HomeScreen = ({navigation}) => {
 
   // Add this state variable with your other state declarations
   const [profileImage, setProfileImage] = useState(user?.avatar_url || null);
+
+  useEffect(() => {
+    calculateStats(allEventsData);
+  }, [allEventsData]);
 
   // Helper function to get proper greeting based on time of day
   const getGreeting = () => {
@@ -137,11 +141,30 @@ const HomeScreen = ({navigation}) => {
   };
 
   // Calculate real stats from events data
-  const calculateStats = eventsData => {
+  const calculateStats = allEventsData => {
     const now = new Date();
 
+    // Combine all events from all categories
+    const allEvents = [
+      ...allEventsData.myEvents,
+      ...allEventsData.ongoingEvents,
+      ...allEventsData.registeredEvents,
+    ];
+
+    // Remove duplicates by event id
+    const uniqueEvents = [];
+    const seenIds = new Set();
+    for (const ev of allEvents) {
+      if (!seenIds.has(ev.id)) {
+        uniqueEvents.push(ev);
+        seenIds.add(ev.id);
+      }
+    }
+
     // Count upcoming events (events that haven't ended yet)
-    const upcoming = eventsData.filter(event => new Date(event.endDate) >= now);
+    const upcoming = uniqueEvents.filter(
+      event => new Date(event.endDate) >= now,
+    );
 
     // Count this week's meetings/events
     const oneWeekFromNow = new Date(now);
@@ -164,7 +187,6 @@ const HomeScreen = ({navigation}) => {
     }
 
     // Get new registrations this week (dummy logic - replace with actual if available)
-    // This would ideally be fetched from the server
     const newRegistrations = Math.min(upcoming.length, 2);
 
     setStats({
@@ -178,18 +200,21 @@ const HomeScreen = ({navigation}) => {
   // Add new function to fetch all events data for unified calendar
   const fetchAllEventsData = async () => {
     try {
-      const [myEventsData, ongoingEventsData, registeredEventsData] = await Promise.all([
-        eventService.getMyEvents(),
-        eventService.getOngoingEvents(),
-        eventService.getRegisteredEvents()
-      ]);
+      const [myEventsData, ongoingEventsData, registeredEventsData] =
+        await Promise.all([
+          eventService.getMyEvents(),
+          eventService.getOngoingEvents(),
+          eventService.getRegisteredEvents(),
+        ]);
 
       // Add brochure info for each category
-      const processEvents = async (eventsArray) => {
+      const processEvents = async eventsArray => {
         return await Promise.all(
           eventsArray.map(async event => {
             try {
-              const brochureData = await eventService.getEventBrochure(event.id);
+              const brochureData = await eventService.getEventBrochure(
+                event.id,
+              );
               return {...event, brochure: brochureData};
             } catch (error) {
               return event;
@@ -198,18 +223,21 @@ const HomeScreen = ({navigation}) => {
         );
       };
 
-      const [myEventsWithBrochures, ongoingEventsWithBrochures, registeredEventsWithBrochures] = await Promise.all([
+      const [
+        myEventsWithBrochures,
+        ongoingEventsWithBrochures,
+        registeredEventsWithBrochures,
+      ] = await Promise.all([
         processEvents(myEventsData),
         processEvents(ongoingEventsData),
-        processEvents(registeredEventsData)
+        processEvents(registeredEventsData),
       ]);
 
       setAllEventsData({
         myEvents: myEventsWithBrochures,
         ongoingEvents: ongoingEventsWithBrochures,
-        registeredEvents: registeredEventsWithBrochures
+        registeredEvents: registeredEventsWithBrochures,
       });
-
     } catch (error) {
       console.error('Failed to load all events data:', error);
     }
@@ -276,7 +304,6 @@ const HomeScreen = ({navigation}) => {
       );
 
       setEvents(eventsWithBrochures);
-      calculateStats(eventsWithBrochures); // Calculate stats based on events
     } catch (error) {
       console.error('Failed to load events:', error);
     } finally {
@@ -423,15 +450,17 @@ const HomeScreen = ({navigation}) => {
   }, [searchTerm, events]);
 
   // Updated function to generate unified marked dates with different colors
-  const generateUnifiedMarkedDates = (allEvents) => {
+  const generateUnifiedMarkedDates = allEvents => {
     const marks = {};
 
-    // Define colors for each category
+    // Define colors and priorities for each category
     const colors = {
-      myEvents: '#2e7af5',      // Blue for my events
-      ongoingEvents: '#4CAF50',  // Green for ongoing events
+      myEvents: '#2e7af5',        // Blue for my events
+      ongoingEvents: '#4CAF50',   // Green for ongoing events
       registeredEvents: '#FF9800' // Orange for registered events
     };
+    // Change this line - put ongoingEvents first so it gets priority for circles
+    const priorities = ['ongoingEvents', 'myEvents', 'registeredEvents'];
 
     // Process each category
     Object.keys(allEvents).forEach(category => {
@@ -465,26 +494,15 @@ const HomeScreen = ({navigation}) => {
           const day = String(currentDate.getDate()).padStart(2, '0');
           const dateString = `${year}-${month}-${day}`;
 
-          // If date already exists, create multi-color dots
-          if (marks[dateString]) {
-            // Add to existing dots array
-            if (!marks[dateString].dots) {
-              marks[dateString].dots = [{color: marks[dateString].selectedColor}];
-            }
-            // Check if this color already exists
-            const colorExists = marks[dateString].dots.some(dot => dot.color === color);
-            if (!colorExists) {
-              marks[dateString].dots.push({color});
-            }
-            // Remove selectedColor property when using dots
-            delete marks[dateString].selectedColor;
-            delete marks[dateString].selected;
+          // Always use dots array for multi-dot marking
+          if (!marks[dateString]) {
+            marks[dateString] = { dots: [{ color, key: category }], categories: [category] };
           } else {
-            // First event for this date
-            marks[dateString] = {
-              selected: true,
-              selectedColor: color,
-            };
+            // Only add the color if it's not already present
+            if (!marks[dateString].dots.some(dot => dot.color === color)) {
+              marks[dateString].dots.push({ color, key: category });
+              marks[dateString].categories.push(category);
+            }
           }
 
           currentDate.setDate(currentDate.getDate() + 1);
@@ -492,12 +510,30 @@ const HomeScreen = ({navigation}) => {
       });
     });
 
+    // Now, for each date, set selected/selectedColor based on priority
+    Object.keys(marks).forEach(dateString => {
+      const cats = marks[dateString].categories;
+      for (let i = 0; i < priorities.length; i++) {
+        if (cats.includes(priorities[i])) {
+          marks[dateString].selected = true;
+          marks[dateString].selectedColor = colors[priorities[i]];
+          break;
+        }
+      }
+      // Remove helper property
+      delete marks[dateString].categories;
+    });
+
     return marks;
   };
 
   // Update the useEffect for marked dates to use unified data
   useEffect(() => {
-    if (allEventsData.myEvents.length > 0 || allEventsData.ongoingEvents.length > 0 || allEventsData.registeredEvents.length > 0) {
+    if (
+      allEventsData.myEvents.length > 0 ||
+      allEventsData.ongoingEvents.length > 0 ||
+      allEventsData.registeredEvents.length > 0
+    ) {
       try {
         const marks = generateUnifiedMarkedDates(allEventsData);
         setMarkedDates(marks);
@@ -533,10 +569,7 @@ const HomeScreen = ({navigation}) => {
           style={styles.profileIconContainer}
           onPress={() => navigation.navigate('Profile')}>
           {profileImage ? (
-            <Image
-              source={{uri: profileImage}}
-              style={styles.profileImage}
-            />
+            <Image source={{uri: profileImage}} style={styles.profileImage} />
           ) : (
             <View style={styles.profileInitialContainer}>
               <Text style={styles.profileInitialText}>
@@ -713,13 +746,14 @@ const HomeScreen = ({navigation}) => {
         <View style={styles.calendarOverlay}>
           <View style={styles.calendarContainer}>
             <View style={styles.calendarHeader}>
-              <Text style={styles.calendarTitle}>Unified Event Calendar</Text>
+              <Text style={styles.calendarTitle}>Event Calendar</Text>
               <TouchableOpacity onPress={() => setShowCalendar(false)}>
                 <Icon name="close" size={24} color="#333" />
               </TouchableOpacity>
             </View>
 
             <Calendar
+              markingType="multi-dot" // <-- Add this line
               markedDates={markedDates}
               hideExtraDays={true}
               enableSwipeMonths={true}
@@ -741,15 +775,21 @@ const HomeScreen = ({navigation}) => {
 
             <View style={styles.calendarLegend}>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, {backgroundColor: '#2e7af5'}]} />
-                <Text style={styles.legendText}>My Events       </Text>
+                <View
+                  style={[styles.legendDot, {backgroundColor: '#2e7af5'}]}
+                />
+                <Text style={styles.legendText}>My Events    </Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, {backgroundColor: '#4CAF50'}]} />
-                <Text style={styles.legendText}>Ongoing Events    </Text>
+                <View
+                  style={[styles.legendDot, {backgroundColor: '#4CAF50'}]}
+                />
+                <Text style={styles.legendText}>Ongoing Events   </Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, {backgroundColor: '#FF9800'}]} />
+                <View
+                  style={[styles.legendDot, {backgroundColor: '#FF9800'}]}
+                />
                 <Text style={styles.legendText}>Registered Events </Text>
               </View>
             </View>
@@ -959,12 +999,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   eventTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginRight: 8,
-    maxWidth: '80%',
-  },
+  fontSize: 18,
+  fontWeight: 'bold',
+  color: '#333',
+  marginRight: 8,
+  maxWidth: '80%',
+  numberOfLines: 1, 
+},
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
