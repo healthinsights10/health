@@ -145,6 +145,17 @@ export const adminService = {
   //   }
   // },
 
+  // Get pending courses count for dashboard
+  getPendingCoursesCount: async () => {
+    try {
+      const response = await api.get('/admin/pending-courses-count');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching pending courses count:', error);
+      return {count: 0}; // Return default to prevent UI breakage
+    }
+  },
+
   // Delete a doctor
   deleteDoctor: async doctorId => {
     try {
@@ -1164,6 +1175,39 @@ export const courseService = {
       throw error;
     }
   },
+
+  // Get pending courses (admin only)
+  getPendingCourses: async () => {
+    try {
+      const response = await api.get('/courses/pending');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching pending courses:', error);
+      throw error;
+    }
+  },
+
+  // Approve a course
+  approveCourse: async (courseId, notes = '') => {
+    try {
+      const response = await api.put(`/courses/${courseId}/approve`, {notes});
+      return response.data;
+    } catch (error) {
+      console.error('Error approving course:', error);
+      throw error;
+    }
+  },
+
+  // Reject a course
+  rejectCourse: async (courseId, notes) => {
+    try {
+      const response = await api.put(`/courses/${courseId}/reject`, {notes});
+      return response.data;
+    } catch (error) {
+      console.error('Error rejecting course:', error);
+      throw error;
+    }
+  },
 };
 
 // Add these methods to your existing exports
@@ -1218,23 +1262,3 @@ export const quizService = {
     }
   },
 };
-
-// Get pending courses (admin only)
-export const getPendingCourses = async () => {
-  const response = await api.get('/courses/pending');
-  return response.data;
-};
-
-// Approve a course
-export const approveCourse = async (courseId, notes = '') => {
-  const response = await api.put(`/courses/${courseId}/approve`, {notes});
-  return response.data;
-};
-
-// Reject a course
-export const rejectCourse = async (courseId, notes) => {
-  const response = await api.put(`/courses/${courseId}/reject`, {notes});
-  return response.data;
-};
-
-export default api;
