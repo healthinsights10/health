@@ -43,6 +43,10 @@ const SignUpScreen = ({navigation}) => {
   // Add state for WebView document picker
   const [webViewPickerVisible, setWebViewPickerVisible] = useState(false);
 
+  // Password visibility states
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const {signup, login} = useAuth();
 
   const selectRole = selectedRole => {
@@ -570,22 +574,44 @@ const SignUpScreen = ({navigation}) => {
         )}
 
         <Text style={styles.inputLabel}>Password</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Create a password"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Create a password"
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={setPassword}
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setShowPassword(!showPassword)}>
+            <Icon
+              name={showPassword ? 'eye-off' : 'eye'}
+              size={20}
+              color="#666"
+            />
+          </TouchableOpacity>
+        </View>
 
         <Text style={styles.inputLabel}>Confirm Password</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Confirm your password"
-          secureTextEntry
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-        />
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Confirm your password"
+            secureTextEntry={!showConfirmPassword}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+            <Icon
+              name={showConfirmPassword ? 'eye-off' : 'eye'}
+              size={20}
+              color="#666"
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.termsContainer}>
@@ -809,6 +835,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     color: '#2e7af5',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e1e1e1',
+    marginBottom: 16,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 16,
+  },
+  eyeButton: {
+    paddingHorizontal: 16,
   },
 });
 

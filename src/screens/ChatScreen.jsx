@@ -33,8 +33,8 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {WebView} from 'react-native-webview';
 import MessageItem from '../components/MessageItem';
 
-const SOCKET_URL = 'http://192.168.1.8:5000';
-const API_URL = 'http://192.168.1.8:5000';
+const SOCKET_URL = 'http://192.168.1.10:5000';
+const API_URL = 'http://192.168.1.10:5000';
 
 const ChatScreen = ({route, navigation}) => {
   // Auth context
@@ -1417,103 +1417,103 @@ const ChatScreen = ({route, navigation}) => {
 
   // Update the renderSearchInterface function with these changes:
 
-const renderSearchInterface = () => (
-  <View style={styles.searchInterfaceContainer}>
-    <Text style={styles.searchTitle}>Connect Here!</Text>
-    <Text style={styles.searchSubtitle}>
-      Search for a doctor by email or phone to start a conversation
-    </Text>
+  const renderSearchInterface = () => (
+    <View style={styles.searchInterfaceContainer}>
+      <Text style={styles.searchTitle}>Connect Here!</Text>
+      <Text style={styles.searchSubtitle}>
+        Search for a doctor by email or phone to start a conversation
+      </Text>
 
-    <View style={styles.searchBarContainer}>
-      <Icon name="magnify" size={20} color="#666" style={styles.searchIcon} />
-      <TextInput
-        ref={searchInputRef}
-        style={styles.searchBarInput}
-        placeholder="Search by email or phone number"
-        placeholderTextColor="#999999" 
-        value={searchQuery}
-        onChangeText={handleSearchChange}
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
-      {searchQuery.length > 0 && (
-        <TouchableOpacity
-          onPress={() => {
-            setSearchQuery('');
-            setSearchResults([]);
-            setNoResultsFound(false);
-          }}
-          style={styles.clearButton}>
-          <Icon name="close-circle" size={18} color="#888" />
-        </TouchableOpacity>
+      <View style={styles.searchBarContainer}>
+        <Icon name="magnify" size={20} color="#666" style={styles.searchIcon} />
+        <TextInput
+          ref={searchInputRef}
+          style={styles.searchBarInput}
+          placeholder="Search by email or phone number"
+          placeholderTextColor="#999999"
+          value={searchQuery}
+          onChangeText={handleSearchChange}
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity
+            onPress={() => {
+              setSearchQuery('');
+              setSearchResults([]);
+              setNoResultsFound(false);
+            }}
+            style={styles.clearButton}>
+            <Icon name="close-circle" size={18} color="#888" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {searching ? (
+        <View style={styles.searchStatusContainer}>
+          <ActivityIndicator size="small" color="#2e7af5" />
+          <Text style={styles.searchingText}>Searching...</Text>
+        </View>
+      ) : searchQuery.length > 0 ? (
+        // Show search results only when there's a search query
+        noResultsFound ? (
+          <View style={styles.searchStatusContainer}>
+            <Icon name="account-search-outline" size={40} color="#ccc" />
+            <Text style={styles.noResultsText}>No matching users found</Text>
+            <Text style={styles.noResultsSubText}>
+              Try a different email address or phone number
+            </Text>
+          </View>
+        ) : searchResults.length > 0 ? (
+          // Display search results when available
+          <View style={styles.searchResultsSection}>
+            <Text style={styles.resultsHeader}>Search Results</Text>
+            <FlatList
+              data={searchResults}
+              renderItem={renderUserSearchResult}
+              keyExtractor={item => item.id}
+              style={styles.searchResultsList}
+            />
+          </View>
+        ) : null
+      ) : (
+        // Show recent chats only when not searching
+        recentChats.length > 0 && (
+          <>
+            <Text style={styles.recentChatsHeader}>Recent Conversations</Text>
+            <FlatList
+              data={recentChats}
+              renderItem={renderRecentChat}
+              keyExtractor={item => item.id}
+              style={styles.recentChatsList}
+            />
+          </>
+        )
+      )}
+
+      {/* Only show admin support option when not actively searching */}
+      {!searchQuery.length > 0 && (
+        <View style={styles.adminSupportContainer}>
+          <Text style={styles.orDivider}>OR</Text>
+          <TouchableOpacity
+            style={styles.adminSupportButton}
+            onPress={() =>
+              setSelectedDoctor({
+                id: 'admin',
+                name: 'Support Team',
+                role: 'admin',
+                isAdminSupport: true,
+              })
+            }>
+            <Icon name="headset" size={24} color="#fff" />
+            <Text style={styles.adminSupportButtonText}>
+              Contact Admin Support
+            </Text>
+          </TouchableOpacity>
+        </View>
       )}
     </View>
-
-    {searching ? (
-      <View style={styles.searchStatusContainer}>
-        <ActivityIndicator size="small" color="#2e7af5" />
-        <Text style={styles.searchingText}>Searching...</Text>
-      </View>
-    ) : searchQuery.length > 0 ? (
-      // Show search results only when there's a search query
-      noResultsFound ? (
-        <View style={styles.searchStatusContainer}>
-          <Icon name="account-search-outline" size={40} color="#ccc" />
-          <Text style={styles.noResultsText}>No matching users found</Text>
-          <Text style={styles.noResultsSubText}>
-            Try a different email address or phone number
-          </Text>
-        </View>
-      ) : searchResults.length > 0 ? (
-        // Display search results when available
-        <View style={styles.searchResultsSection}>
-          <Text style={styles.resultsHeader}>Search Results</Text>
-          <FlatList
-            data={searchResults}
-            renderItem={renderUserSearchResult}
-            keyExtractor={item => item.id}
-            style={styles.searchResultsList}
-          />
-        </View>
-      ) : null
-    ) : (
-      // Show recent chats only when not searching
-      recentChats.length > 0 && (
-        <>
-          <Text style={styles.recentChatsHeader}>Recent Conversations</Text>
-          <FlatList
-            data={recentChats}
-            renderItem={renderRecentChat}
-            keyExtractor={item => item.id}
-            style={styles.recentChatsList}
-          />
-        </>
-      )
-    )}
-
-    {/* Only show admin support option when not actively searching */}
-    {!searchQuery.length > 0 && (
-      <View style={styles.adminSupportContainer}>
-        <Text style={styles.orDivider}>OR</Text>
-        <TouchableOpacity
-          style={styles.adminSupportButton}
-          onPress={() =>
-            setSelectedDoctor({
-              id: 'admin',
-              name: 'Support Team',
-              role: 'admin',
-              isAdminSupport: true,
-            })
-          }>
-          <Icon name="headset" size={24} color="#fff" />
-          <Text style={styles.adminSupportButtonText}>
-            Contact Admin Support
-          </Text>
-        </TouchableOpacity>
-      </View>
-    )}
-  </View>
-);
+  );
 
   // Add a new render function for recent chats
   const renderRecentChat = ({item}) => {
@@ -2736,11 +2736,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 16,
   },
-searchResultsSection: {
-  flex: 1,
-  marginTop: 8,
-  marginBottom: 16,
-},
+  searchResultsSection: {
+    flex: 1,
+    marginTop: 8,
+    marginBottom: 16,
+  },
   searchingText: {
     marginLeft: 8,
     fontSize: 16,

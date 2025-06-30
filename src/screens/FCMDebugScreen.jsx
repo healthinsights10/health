@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import {useAuth} from '../context/AuthContext';
 
-const API_URL = 'http://192.168.1.8:5000/api';
+const API_URL = 'http://192.168.1.10:5000/api';
 const FCMDebugScreen = () => {
   const {user} = useAuth(); // Changed from destructuring getAuthToken
   const [fcmToken, setFcmToken] = useState('');

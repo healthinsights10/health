@@ -9,15 +9,18 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons'; // Add this import
 import {useAuth} from '../context/AuthContext';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 const LoginScreen = ({navigation}) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false); // Add this state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const {login, resendVerification} = useAuth();
-    const insets = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
+
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Error', 'Please enter email and password');
@@ -101,13 +104,24 @@ const LoginScreen = ({navigation}) => {
         />
 
         <Text style={styles.inputLabel}>Password</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter your password"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Enter your password"
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={setPassword}
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setShowPassword(!showPassword)}>
+            <Icon
+              name={showPassword ? 'eye-off' : 'eye'}
+              size={20}
+              color="#666"
+            />
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity style={styles.forgotPassword}>
           <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
@@ -177,6 +191,25 @@ const styles = StyleSheet.create({
     borderColor: '#e1e1e1',
     fontSize: 16,
     color: '#333',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e1e1e1',
+    marginBottom: 16,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: '#333',
+  },
+  eyeButton: {
+    paddingHorizontal: 16,
   },
   forgotPassword: {
     alignSelf: 'flex-end',

@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Base URL for API calls
-const API_URL = 'http://192.168.1.8:5000/api';
+const API_URL = 'http://192.168.1.10:5000/api';
 
 // Create axios instance with better configuration
 const api = axios.create({
@@ -1028,7 +1028,7 @@ export const courseService = {
   },
 
   // Delete course
-  deleteCourse: async (courseId) => {
+  deleteCourse: async courseId => {
     try {
       console.log('Deleting course:', courseId);
       const response = await api.delete(`/courses/${courseId}`);
@@ -1063,17 +1063,17 @@ export const courseService = {
   getCourseDiscussions: async (courseId, videoId = null) => {
     try {
       let url = `/courses/${courseId}/discussions`;
-      
+
       // Only add videoId as query param if it exists and isn't null/undefined
       if (videoId && videoId !== 'null' && videoId !== 'undefined') {
         url += `?video_id=${videoId}`;
       }
-      
+
       console.log('Requesting discussions from:', url);
-      
+
       const response = await api.get(url);
       console.log(`Retrieved ${response.data?.length || 0} discussions`);
-      
+
       return response.data || [];
     } catch (error) {
       console.error('Error fetching course discussions:', error);
@@ -1113,7 +1113,7 @@ export const courseService = {
   },
 
   // Get course comments
-  getCourseComments: async (courseId) => {
+  getCourseComments: async courseId => {
     try {
       const response = await api.get(`/courses/${courseId}/comments`);
       return response.data;
@@ -1139,7 +1139,9 @@ export const courseService = {
   // Get video comments
   getVideoComments: async (courseId, videoId) => {
     try {
-      const response = await api.get(`/courses/${courseId}/videos/${videoId}/comments`);
+      const response = await api.get(
+        `/courses/${courseId}/videos/${videoId}/comments`,
+      );
       return response.data;
     } catch (error) {
       console.error('Error getting video comments:', error);
@@ -1150,9 +1152,12 @@ export const courseService = {
   // Add a comment to a video
   addVideoComment: async (courseId, videoId, content) => {
     try {
-      const response = await api.post(`/courses/${courseId}/videos/${videoId}/comments`, {
-        content,
-      });
+      const response = await api.post(
+        `/courses/${courseId}/videos/${videoId}/comments`,
+        {
+          content,
+        },
+      );
       return response.data;
     } catch (error) {
       console.error('Error adding video comment:', error);
@@ -1164,7 +1169,7 @@ export const courseService = {
 // Add these methods to your existing exports
 export const quizService = {
   // Fetch quiz for an event (updated to include attempts)
-  fetchQuiz: async (eventId) => {
+  fetchQuiz: async eventId => {
     try {
       const response = await api.get(`/quiz/${eventId}`);
       return response.data;
@@ -1191,7 +1196,10 @@ export const quizService = {
   // Submit quiz answers (updated)
   submitQuiz: async (eventId, submissionData) => {
     try {
-      const response = await api.post(`/quiz/submit/${eventId}`, submissionData);
+      const response = await api.post(
+        `/quiz/submit/${eventId}`,
+        submissionData,
+      );
       return response.data;
     } catch (error) {
       console.error('Error submitting quiz:', error);
@@ -1200,7 +1208,7 @@ export const quizService = {
   },
 
   // Get quiz results
-  getQuizResults: async (eventId) => {
+  getQuizResults: async eventId => {
     try {
       const response = await api.get(`/quiz/${eventId}/results`);
       return response.data;
@@ -1208,6 +1216,25 @@ export const quizService = {
       console.error('Error fetching quiz results:', error);
       throw error;
     }
-  }
+  },
 };
+
+// Get pending courses (admin only)
+export const getPendingCourses = async () => {
+  const response = await api.get('/courses/pending');
+  return response.data;
+};
+
+// Approve a course
+export const approveCourse = async (courseId, notes = '') => {
+  const response = await api.put(`/courses/${courseId}/approve`, {notes});
+  return response.data;
+};
+
+// Reject a course
+export const rejectCourse = async (courseId, notes) => {
+  const response = await api.put(`/courses/${courseId}/reject`, {notes});
+  return response.data;
+};
+
 export default api;

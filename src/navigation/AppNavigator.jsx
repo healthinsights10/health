@@ -50,6 +50,7 @@ import SponsorshipRequestsScreen from '../screens/SponsorshipRequestsScreen';
 import FCMDebugScreen from '../screens/FCMDebugScreen';
 import QuizScreen from '../screens/QuizScreen';
 import AdminQuizScreen from '../screens/admin/AdminQuizScreen';
+import PendingCoursesScreen from '../screens/admin/PendingCoursesScreen';
 
 const Stack = createStackNavigator();
 const AdminStack = createStackNavigator();
@@ -121,6 +122,13 @@ const AdminNavigator = () => {
         options={{
           headerShown: true,
           title: 'Manage Quiz',
+        }}
+      />
+      <Stack.Screen
+        name="PendingCourses"
+        component={PendingCoursesScreen}
+        options={{
+          headerShown: false,
         }}
       />
     </AdminStack.Navigator>
