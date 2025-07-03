@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Image,
   Linking,
+  Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -46,16 +47,17 @@ const MessageItem = ({message, currentUserId, onAttachmentPress}) => {
       return null;
     }
 
-    // Check if the message contains URLs
-    const urlPattern = /(https?:\/\/[^\s]+)/g;
-    const parts = message.content.split(urlPattern);
+    // Enhanced URL pattern to catch both HTTP and custom scheme URLs
+    const urlPattern = /(https?:\/\/[^\s]+|medevents:\/\/[^\s]+)/g;
     
-    if (parts.length === 1) {
+    if (!urlPattern.test(message.content)) {
       // No URLs found, render as plain text
       return <Text style={styles.messageText}>{message.content}</Text>;
     }
 
-    // URLs found, render with clickable links
+    // Split content by URLs and create clickable links
+    const parts = message.content.split(urlPattern);
+    
     return (
       <Text style={styles.messageText}>
         {parts.map((part, index) => {
@@ -64,15 +66,42 @@ const MessageItem = ({message, currentUserId, onAttachmentPress}) => {
               <Text
                 key={index}
                 style={styles.linkText}
-                onPress={() => Linking.openURL(part)}>
+                onPress={() => handleLinkPress(part)}>
                 {part}
               </Text>
             );
           }
-          return part;
+          return <Text key={index}>{part}</Text>;
         })}
       </Text>
     );
+  };
+
+  // Add this function to handle link press with better error handling
+  const handleLinkPress = async (url) => {
+    try {
+      console.log('Attempting to open URL:', url);
+      const supported = await Linking.canOpenURL(url);
+      
+      if (supported) {
+        await Linking.openURL(url);
+        console.log('URL opened successfully');
+      } else {
+        console.log('URL not supported:', url);
+        Alert.alert(
+          'Cannot Open Link',
+          'This link cannot be opened on your device.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Error opening URL:', error);
+      Alert.alert(
+        'Error',
+        'Failed to open the link. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const renderAttachment = () => {

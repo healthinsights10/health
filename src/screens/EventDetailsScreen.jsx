@@ -21,6 +21,7 @@ import {useAuth} from '../context/AuthContext';
 import PdfViewer from '../components/PdfViewer';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Share from 'react-native-share';
+import sharingService from '../services/sharingService';
 
 // Event Status Badge Component (reused from HomeScreen)
 const EventStatusBadge = ({status}) => {
@@ -229,28 +230,30 @@ const EventDetailsScreen = ({route, navigation}) => {
 
 const handleShareEvent = async () => {
   try {
-    // Create a universal link that works in browsers and apps
-    const universalLink = `https://medevents.app/event/${eventId}`;
-    const customScheme = `medevents://event/${eventId}`;
-    
-    const shareMessage = `🏥 *${event.title}*\n\n📝 ${event.description}\n\n📅 ${formatDate(event.startDate)} at ${formatTime(event.startDate)}\n📍 ${event.mode === 'Virtual' ? 'Virtual Event' : event.venue}\n\n📱 Open in MedEvents app: ${universalLink}\n\n💿 Don't have the app? Search "MedEvents" in your app store!`;
-    
-    const shareOptions = {
-      title: 'Check out this medical event!',
-      message: shareMessage,
-      url: universalLink, // This makes the link clickable in most apps
-    };
-
-    const result = await Share.open(shareOptions);
-    console.log('Share result:', result);
-    
+    await sharingService.shareEvent(eventId, {
+      title: event.title,
+      description: event.description,
+      startDate: event.startDate,
+      mode: event.mode,
+      venue: event.venue
+    });
   } catch (error) {
-    console.error('Share error:', error);
-    if (error.message !== 'User did not share') {
-      const fallbackText = `🏥 ${event.title}\n\nEvent ID: ${eventId}\nOpen MedEvents app to view details`;
-      Clipboard.setString(fallbackText);
-      Alert.alert('Event Details Copied!', 'Event information copied to clipboard.');
-    }
+    console.error('Failed to share event:', error);
+  }
+};
+
+const handleShareMeeting = async () => {
+  try {
+    await sharingService.shareMeeting(eventId, {
+      title: event.title,
+      description: event.description,
+      date: event.startDate,
+      mode: event.mode,
+      venue: event.venue,
+      organizer: event.organizerName
+    });
+  } catch (error) {
+    console.error('Failed to share meeting:', error);
   }
 };
 
@@ -300,7 +303,7 @@ const handleShareEvent = async () => {
         <Text style={styles.headerTitle}>Event Details</Text>
         <TouchableOpacity 
           style={styles.headerActionButton}
-          onPress={handleShareEvent}
+          onPress={handleShareMeeting}
         >
           <Icon name="share-variant" size={24} color="#2e7af5" />
         </TouchableOpacity>
