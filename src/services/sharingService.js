@@ -48,8 +48,10 @@ class SharingService {
   async shareContent(type, id, content) {
     try {
       const customScheme = `medevents://${type}/${id}`;
+      // Create a dummy HTTP URL that WhatsApp will recognize as clickable
+      const httpFallback = `https://medevents.app/${type}/${id}`;
       
-      const shareMessage = `${content.emoji} *${content.title}*\n\n${content.description}\n\n${content.extraInfo || ''}\n\n📱 Open in MedEvents app: ${customScheme}\n\n💿 Don't have the app? Search "MedEvents" in your app store!`;
+      const shareMessage = `${content.emoji} *${content.title}*\n\n${content.description}\n\n${content.extraInfo || ''}\n\n📱 Open in MedEvents app: ${httpFallback}\n\n💿 Don't have the app? Search "MedEvents" in your app store!`;
       
       const shareOptions = {
         title: `Check out this ${content.type}!`,
