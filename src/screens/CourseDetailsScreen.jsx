@@ -38,10 +38,13 @@ const CourseDetailsScreen = ({route, navigation}) => {
 
   // Add useEffect to handle hardware back button
   useEffect(() => {
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      handleBackNavigation();
-      return true; // Prevent default back action
-    });
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        handleBackNavigation();
+        return true; // Prevent default back action
+      },
+    );
 
     return () => backHandler.remove();
   }, []);
@@ -68,16 +71,13 @@ const CourseDetailsScreen = ({route, navigation}) => {
     // Check if we can go back to Courses screen
     const navigationState = navigation.getState();
     const routeNames = navigationState.routes.map(route => route.name);
-    
+
     // If Courses screen exists in the stack, navigate to it
     if (routeNames.includes('Courses')) {
-      navigation.navigate('Courses');
+      navigation.goBack();
     } else {
       // Otherwise, reset navigation to Courses
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Courses' }],
-      });
+      navigation.goBack();
     }
   };
 
@@ -121,44 +121,48 @@ const CourseDetailsScreen = ({route, navigation}) => {
   };
 
   const handleDeleteCourse = async () => {
-  Alert.alert(
-    'Delete Course',
-    'Are you sure you want to delete this course? This action cannot be undone.',
-    [
-      {
-        text: 'Cancel',
-        style: 'cancel',
-      },
-      {
-        text: 'Delete',
-        onPress: async () => {
-          try {
-            console.log('Starting course deletion process...');
-            await courseService.deleteCourse(courseId);
-            console.log('Course deleted successfully');
-            
-            Alert.alert('Success', 'Course deleted successfully', [
-              {
-                text: 'OK',
-                onPress: () => handleBackNavigation()
-              }
-            ]);
-          } catch (error) {
-            console.error('Error deleting course:', error);
-            
-            let errorMessage = 'Failed to delete course';
-            if (error.response && error.response.data && error.response.data.message) {
-              errorMessage = error.response.data.message;
-            }
-            
-            Alert.alert('Error', errorMessage);
-          }
+    Alert.alert(
+      'Delete Course',
+      'Are you sure you want to delete this course? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
         },
-        style: 'destructive',
-      },
-    ],
-  );
-};
+        {
+          text: 'Delete',
+          onPress: async () => {
+            try {
+              console.log('Starting course deletion process...');
+              await courseService.deleteCourse(courseId);
+              console.log('Course deleted successfully');
+
+              Alert.alert('Success', 'Course deleted successfully', [
+                {
+                  text: 'OK',
+                  onPress: () => handleBackNavigation(),
+                },
+              ]);
+            } catch (error) {
+              console.error('Error deleting course:', error);
+
+              let errorMessage = 'Failed to delete course';
+              if (
+                error.response &&
+                error.response.data &&
+                error.response.data.message
+              ) {
+                errorMessage = error.response.data.message;
+              }
+
+              Alert.alert('Error', errorMessage);
+            }
+          },
+          style: 'destructive',
+        },
+      ],
+    );
+  };
 
   const handleSelectVideo = video => {
     console.log('Selecting video:', {
@@ -188,7 +192,10 @@ const CourseDetailsScreen = ({route, navigation}) => {
           </View>
           <View style={styles.videoInfo}>
             <Text
-              style={[styles.videoCardTitle, isActive && styles.activeVideoTitle]}
+              style={[
+                styles.videoCardTitle,
+                isActive && styles.activeVideoTitle,
+              ]}
               numberOfLines={2}>
               {item.title}
             </Text>
@@ -238,7 +245,9 @@ const CourseDetailsScreen = ({route, navigation}) => {
         <Text style={styles.errorText}>Course not found</Text>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={handleBackNavigation}> {/* Update this */}
+          onPress={handleBackNavigation}>
+          {' '}
+          {/* Update this */}
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
       </SafeAreaView>
@@ -255,7 +264,9 @@ const CourseDetailsScreen = ({route, navigation}) => {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={handleBackNavigation}> {/* Update this */}
+          onPress={handleBackNavigation}>
+          {' '}
+          {/* Update this */}
           <Icon name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>

@@ -26,6 +26,7 @@ const AdminDashboardScreen = ({navigation}) => {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [pendingCoursesCount, setPendingCoursesCount] = useState(0);
 
   const fetchDashboardData = async () => {
     try {
@@ -38,6 +39,10 @@ const AdminDashboardScreen = ({navigation}) => {
         totalPharma: data.totalPharma || 0,
         pendingEvents: data.pendingEvents || 0,
       });
+
+      // Fetch pending courses count
+      const coursesData = await adminService.getPendingCoursesCount();
+      setPendingCoursesCount(coursesData.count || 0);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       // Keep previous stats or set defaults
@@ -195,6 +200,28 @@ const AdminDashboardScreen = ({navigation}) => {
             <Icon name="chevron-right" size={24} color="#ccc" />
           </TouchableOpacity>
         </View>
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Pending Courses</Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.dashboardCard}
+          onPress={() => navigation.navigate('PendingCourses')}>
+          <View style={styles.dashboardIconContainer}>
+            <Icon name="book-clock" size={24} color="#2e7af5" />
+            {pendingCoursesCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{pendingCoursesCount}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.dashboardCardTitle}>Pending Courses</Text>
+          <Text style={styles.dashboardCardSubtitle}>
+            {pendingCoursesCount} course{pendingCoursesCount === 1 ? '' : 's'}{' '}
+            awaiting review
+          </Text>
+        </TouchableOpacity>
 
         {/* <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recent Activity</Text>
@@ -412,6 +439,47 @@ const styles = StyleSheet.create({
   },
   bold: {
     fontWeight: 'bold',
+  },
+  dashboardCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    margin: 16,
+    marginTop: 8,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  dashboardIconContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  badge: {
+    backgroundColor: '#e53935',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  dashboardCardTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  dashboardCardSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
   },
 });
 

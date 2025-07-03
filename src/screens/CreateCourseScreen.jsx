@@ -28,7 +28,7 @@ const CATEGORIES = [
 ];
 
 const CreateCourseScreen = ({navigation}) => {
-    const insets = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
   const {user} = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -88,21 +88,18 @@ const CreateCourseScreen = ({navigation}) => {
 
       const result = await courseService.createCourse(newCourse);
 
-      Alert.alert('Success', 'Course created successfully!', [
+      // Different messages depending on role
+      const isAdmin = user.role === 'admin';
+      const successMessage = isAdmin
+        ? 'Course created and published successfully!'
+        : 'Course created successfully! It will be visible after admin approval.';
+
+      Alert.alert('Success', successMessage, [
         {
           text: 'Add Videos Now',
           onPress: () => {
-            // Check if result and result.course exist before accessing id
-            if (result && result.course && result.course.id) {
-              navigation.navigate('AddCourseVideo', {courseId: result.course.id});
-            } else if (result && result.id) {
-              // Alternative structure - if the course ID is directly on the result
-              navigation.navigate('AddCourseVideo', {courseId: result.id});
-            } else {
-              // Fallback if no course ID can be found
-              console.error('Course ID not found in API response:', result);
-              navigation.navigate('Courses');
-            }
+            const courseId = result.course ? result.course.id : result.id;
+            navigation.navigate('AddCourseVideo', {courseId});
           },
         },
         {

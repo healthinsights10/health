@@ -50,6 +50,7 @@ import SponsorshipRequestsScreen from '../screens/SponsorshipRequestsScreen';
 import FCMDebugScreen from '../screens/FCMDebugScreen';
 import QuizScreen from '../screens/QuizScreen';
 import AdminQuizScreen from '../screens/admin/AdminQuizScreen';
+import PendingCoursesScreen from '../screens/admin/PendingCoursesScreen';
 
 const Stack = createStackNavigator();
 const AdminStack = createStackNavigator();
@@ -75,6 +76,29 @@ const AdminNavigator = () => {
       />
       <AdminStack.Screen name="DoctorList" component={DoctorListScreen} />
       <AdminStack.Screen name="DoctorDetails" component={DoctorDetailsScreen} />
+
+      {/* Add these course-related screens to admin stack */}
+      <AdminStack.Screen
+        name="CourseDetails"
+        component={CourseDetailsScreen}
+        options={{headerShown: false}}
+      />
+      <AdminStack.Screen
+        name="Courses"
+        component={CoursesScreen}
+        options={{headerShown: false}}
+      />
+      <AdminStack.Screen
+        name="CreateCourse"
+        component={CreateCourseScreen}
+        options={{headerShown: false}}
+      />
+      <AdminStack.Screen
+        name="AddCourseVideo"
+        component={AddCourseVideoScreen}
+        options={{headerShown: false}}
+      />
+
       <Stack.Screen
         name="UserVerification"
         component={UserVerificationScreen}
@@ -121,6 +145,13 @@ const AdminNavigator = () => {
         options={{
           headerShown: true,
           title: 'Manage Quiz',
+        }}
+      />
+      <Stack.Screen
+        name="PendingCourses"
+        component={PendingCoursesScreen}
+        options={{
+          headerShown: false,
         }}
       />
     </AdminStack.Navigator>

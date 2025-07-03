@@ -50,11 +50,12 @@ const CoursesScreen = ({navigation}) => {
     if (query.trim() === '') {
       setFilteredCourses(courses);
     } else {
-      const filtered = courses.filter(course =>
-        course.title.toLowerCase().includes(query.toLowerCase()) ||
-        course.description?.toLowerCase().includes(query.toLowerCase()) ||
-        course.creator_name?.toLowerCase().includes(query.toLowerCase()) ||
-        course.category?.toLowerCase().includes(query.toLowerCase()),
+      const filtered = courses.filter(
+        course =>
+          course.title.toLowerCase().includes(query.toLowerCase()) ||
+          course.description?.toLowerCase().includes(query.toLowerCase()) ||
+          course.creator_name?.toLowerCase().includes(query.toLowerCase()) ||
+          course.category?.toLowerCase().includes(query.toLowerCase()),
       );
       setFilteredCourses(filtered);
     }
@@ -76,12 +77,28 @@ const CoursesScreen = ({navigation}) => {
   }, [courses]);
 
   const renderCourseItem = ({item}) => {
+    const isCreator = user?.id === item.creator_id;
+    const isPending = item.status === 'pending';
+    const isRejected = item.status === 'rejected';
+
     return (
       <TouchableOpacity
         style={styles.courseCard}
         onPress={() =>
           navigation.navigate('CourseDetails', {courseId: item.id})
         }>
+        {isCreator && (isPending || isRejected) && (
+          <View
+            style={[
+              styles.statusBadge,
+              isPending ? styles.pendingBadge : styles.rejectedBadge,
+            ]}>
+            <Text style={styles.statusText}>
+              {isPending ? 'Pending Approval' : 'Rejected'}
+            </Text>
+          </View>
+        )}
+
         <Image
           source={{
             uri:
@@ -103,6 +120,13 @@ const CoursesScreen = ({navigation}) => {
               </View>
             )}
           </View>
+
+          {isCreator && isRejected && item.approval_notes && (
+            <View style={styles.feedbackContainer}>
+              <Text style={styles.feedbackLabel}>Feedback:</Text>
+              <Text style={styles.feedbackText}>{item.approval_notes}</Text>
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -351,6 +375,43 @@ const styles = StyleSheet.create({
     color: '#2e7af5',
     fontSize: 14,
     fontWeight: '500',
+  },
+  statusBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  pendingBadge: {
+    backgroundColor: '#fff3cd',
+  },
+  rejectedBadge: {
+    backgroundColor: '#f8d7da',
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#333',
+  },
+  feedbackContainer: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#e1e1e1',
+  },
+  feedbackLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  feedbackText: {
+    fontSize: 14,
+    color: '#666',
   },
 });
 

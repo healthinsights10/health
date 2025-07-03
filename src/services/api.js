@@ -145,6 +145,17 @@ export const adminService = {
   //   }
   // },
 
+  // Get pending courses count for dashboard
+  getPendingCoursesCount: async () => {
+    try {
+      const response = await api.get('/admin/pending-courses-count');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching pending courses count:', error);
+      return {count: 0}; // Return default to prevent UI breakage
+    }
+  },
+
   // Delete a doctor
   deleteDoctor: async doctorId => {
     try {
@@ -1028,7 +1039,7 @@ export const courseService = {
   },
 
   // Delete course
-  deleteCourse: async (courseId) => {
+  deleteCourse: async courseId => {
     try {
       console.log('Deleting course:', courseId);
       const response = await api.delete(`/courses/${courseId}`);
@@ -1063,17 +1074,17 @@ export const courseService = {
   getCourseDiscussions: async (courseId, videoId = null) => {
     try {
       let url = `/courses/${courseId}/discussions`;
-      
+
       // Only add videoId as query param if it exists and isn't null/undefined
       if (videoId && videoId !== 'null' && videoId !== 'undefined') {
         url += `?video_id=${videoId}`;
       }
-      
+
       console.log('Requesting discussions from:', url);
-      
+
       const response = await api.get(url);
       console.log(`Retrieved ${response.data?.length || 0} discussions`);
-      
+
       return response.data || [];
     } catch (error) {
       console.error('Error fetching course discussions:', error);
@@ -1113,7 +1124,7 @@ export const courseService = {
   },
 
   // Get course comments
-  getCourseComments: async (courseId) => {
+  getCourseComments: async courseId => {
     try {
       const response = await api.get(`/courses/${courseId}/comments`);
       return response.data;
@@ -1139,7 +1150,9 @@ export const courseService = {
   // Get video comments
   getVideoComments: async (courseId, videoId) => {
     try {
-      const response = await api.get(`/courses/${courseId}/videos/${videoId}/comments`);
+      const response = await api.get(
+        `/courses/${courseId}/videos/${videoId}/comments`,
+      );
       return response.data;
     } catch (error) {
       console.error('Error getting video comments:', error);
@@ -1150,12 +1163,48 @@ export const courseService = {
   // Add a comment to a video
   addVideoComment: async (courseId, videoId, content) => {
     try {
-      const response = await api.post(`/courses/${courseId}/videos/${videoId}/comments`, {
-        content,
-      });
+      const response = await api.post(
+        `/courses/${courseId}/videos/${videoId}/comments`,
+        {
+          content,
+        },
+      );
       return response.data;
     } catch (error) {
       console.error('Error adding video comment:', error);
+      throw error;
+    }
+  },
+
+  // Get pending courses (admin only)
+  getPendingCourses: async () => {
+    try {
+      const response = await api.get('/courses/pending');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching pending courses:', error);
+      throw error;
+    }
+  },
+
+  // Approve a course
+  approveCourse: async (courseId, notes = '') => {
+    try {
+      const response = await api.put(`/courses/${courseId}/approve`, {notes});
+      return response.data;
+    } catch (error) {
+      console.error('Error approving course:', error);
+      throw error;
+    }
+  },
+
+  // Reject a course
+  rejectCourse: async (courseId, notes) => {
+    try {
+      const response = await api.put(`/courses/${courseId}/reject`, {notes});
+      return response.data;
+    } catch (error) {
+      console.error('Error rejecting course:', error);
       throw error;
     }
   },
@@ -1164,7 +1213,7 @@ export const courseService = {
 // Add these methods to your existing exports
 export const quizService = {
   // Fetch quiz for an event (updated to include attempts)
-  fetchQuiz: async (eventId) => {
+  fetchQuiz: async eventId => {
     try {
       const response = await api.get(`/quiz/${eventId}`);
       return response.data;
@@ -1191,7 +1240,10 @@ export const quizService = {
   // Submit quiz answers (updated)
   submitQuiz: async (eventId, submissionData) => {
     try {
-      const response = await api.post(`/quiz/submit/${eventId}`, submissionData);
+      const response = await api.post(
+        `/quiz/submit/${eventId}`,
+        submissionData,
+      );
       return response.data;
     } catch (error) {
       console.error('Error submitting quiz:', error);
@@ -1200,7 +1252,7 @@ export const quizService = {
   },
 
   // Get quiz results
-  getQuizResults: async (eventId) => {
+  getQuizResults: async eventId => {
     try {
       const response = await api.get(`/quiz/${eventId}/results`);
       return response.data;
@@ -1208,6 +1260,5 @@ export const quizService = {
       console.error('Error fetching quiz results:', error);
       throw error;
     }
-  }
+  },
 };
-export default api;
