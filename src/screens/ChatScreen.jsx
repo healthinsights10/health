@@ -33,8 +33,8 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {WebView} from 'react-native-webview';
 import MessageItem from '../components/MessageItem';
 
-const SOCKET_URL = 'http://192.168.1.7:5000';
-const API_URL = 'http://192.168.1.7:5000';
+const SOCKET_URL = 'http://192.168.1.4:5000';
+const API_URL = 'http://192.168.1.4:5000';
 
 const ChatScreen = ({route, navigation}) => {
   // Auth context

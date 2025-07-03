@@ -6,6 +6,7 @@ import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {fcmService} from './src/services/fcmService';
 import NotificationHandler from './src/components/NotificationHandler';
 import messaging from '@react-native-firebase/messaging';
+import DeepLinkHandler from './src/components/DeepLinkHandler';
 
 // Register background message handler before your App component
 messaging().setBackgroundMessageHandler(async remoteMessage => {
@@ -31,6 +32,7 @@ const App = () => {
     <SafeAreaProvider>
       <AuthProvider>
         <NavigationContainer>
+          <DeepLinkHandler />
           <AppNavigator />
           <NotificationHandler />
         </NavigationContainer>

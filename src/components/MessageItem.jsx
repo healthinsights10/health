@@ -39,6 +39,42 @@ const MessageItem = ({message, currentUserId, onAttachmentPress}) => {
     return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
   };
 
+  const renderMessageText = () => {
+    if (!message.content || 
+        message.content === '📎 Document' || 
+        message.content === '📷 Image') {
+      return null;
+    }
+
+    // Check if the message contains URLs
+    const urlPattern = /(https?:\/\/[^\s]+)/g;
+    const parts = message.content.split(urlPattern);
+    
+    if (parts.length === 1) {
+      // No URLs found, render as plain text
+      return <Text style={styles.messageText}>{message.content}</Text>;
+    }
+
+    // URLs found, render with clickable links
+    return (
+      <Text style={styles.messageText}>
+        {parts.map((part, index) => {
+          if (urlPattern.test(part)) {
+            return (
+              <Text
+                key={index}
+                style={styles.linkText}
+                onPress={() => Linking.openURL(part)}>
+                {part}
+              </Text>
+            );
+          }
+          return part;
+        })}
+      </Text>
+    );
+  };
+
   const renderAttachment = () => {
     if (!message.is_attachment || !message.file_url) return null;
 
@@ -101,11 +137,7 @@ const MessageItem = ({message, currentUserId, onAttachmentPress}) => {
         )}
 
         {/* Show text content if not an attachment or if has both attachment and text */}
-        {(!message.is_attachment || message.content) &&
-          message.content !== '📎 Document' &&
-          message.content !== '📷 Image' && (
-            <Text style={styles.messageText}>{message.content}</Text>
-          )}
+        {(!message.is_attachment || message.content) && renderMessageText()}
 
         {/* Render attachment if present */}
         {renderAttachment()}
@@ -156,6 +188,10 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 16,
     color: '#333',
+  },
+  linkText: {
+    color: '#2e7af5',
+    textDecorationLine: 'underline',
   },
   timestamp: {
     fontSize: 10,
