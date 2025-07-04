@@ -95,19 +95,19 @@ const DeepLinkHandler = () => {
         }
       }
       
-      // Handle https://medevents.app/ URLs (for future use)
-      if (url.includes('medevents.app/')) {
+      // Handle your Vercel domain URLs
+      if (url.includes('medevent-event-sharing.vercel.app/')) {
         if (url.includes('/event/')) {
           const eventId = url.split('/event/')[1].split('?')[0];
           return { type: 'event', eventId: eventId };
         }
-        if (url.includes('/post/')) {
-          const postId = url.split('/post/')[1].split('?')[0];
-          return { type: 'post', postId: postId };
-        }
         if (url.includes('/meeting/')) {
           const eventId = url.split('/meeting/')[1].split('?')[0];
           return { type: 'event', eventId: eventId }; // Route meetings to EventDetailsScreen
+        }
+        if (url.includes('/post/')) {
+          const postId = url.split('/post/')[1].split('?')[0];
+          return { type: 'post', postId: postId };
         }
         if (url.includes('/chat/')) {
           const userId = url.split('/chat/')[1].split('?')[0];

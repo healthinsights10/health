@@ -48,8 +48,8 @@ class SharingService {
   async shareContent(type, id, content) {
     try {
       const customScheme = `medevents://${type}/${id}`;
-      // Create a dummy HTTP URL that WhatsApp will recognize as clickable
-      const httpFallback = `https://medevents.app/${type}/${id}`;
+      // Use your actual Vercel domain
+      const httpFallback = `https://medevent-event-sharing.vercel.app/${type}/${id}`;
       
       const shareMessage = `${content.emoji} *${content.title}*\n\n${content.description}\n\n${content.extraInfo || ''}\n\n📱 Open in MedEvents app: ${httpFallback}\n\n💿 Don't have the app? Search "MedEvents" in your app store!`;
       
