@@ -21,6 +21,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import * as ImagePicker from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useFocusEffect} from '@react-navigation/native'; // ADD THIS IMPORT
+import fcmService from '../services/fcmService'; // Import fcmService
 
 // ADD THIS CONSTANT AT THE TOP
 const API_BASE_URL = 'https://health-server-bw3x.onrender.com/api';
@@ -36,39 +37,45 @@ const Profile = ({navigation}) => {
   const insets = useSafeAreaInsets();
 
   // UPDATED: Fetch user profile with document and avatar
-  const fetchUserProfile = useCallback(async (showLoading = true) => {
-    try {
-      if (!user) {
-        console.log('User data not available yet');
-        return;
-      }
+  const fetchUserProfile = useCallback(
+    async (showLoading = true) => {
+      try {
+        if (!user) {
+          console.log('User data not available yet');
+          return;
+        }
 
-      if (showLoading) setLoading(true);
+        if (showLoading) setLoading(true);
 
-      // Fetch updated user profile
-      const userResponse = await userService.getUserProfile(user.id);
+        // Fetch updated user profile
+        const userResponse = await userService.getUserProfile(user.id);
 
-      if (userResponse && userResponse.avatar_url) {
-        setProfileImage(userResponse.avatar_url);
-      }
+        if (userResponse && userResponse.avatar_url) {
+          setProfileImage(userResponse.avatar_url);
+        }
 
-      // Fetch documents if user is a doctor
-      if (user?.role === 'doctor') {
-        const docResponse = await userService.getMyDocuments();
-        console.log('📄 Documents fetched:', docResponse?.length || 0);
-        setUserDocuments(docResponse || []);
+        // Fetch documents if user is a doctor
+        if (user?.role === 'doctor') {
+          const docResponse = await userService.getMyDocuments();
+          console.log('📄 Documents fetched:', docResponse?.length || 0);
+          setUserDocuments(docResponse || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user profile:', error);
+        // Don't show error alert on refresh, just log it
+        if (showLoading) {
+          Alert.alert(
+            'Error',
+            'Failed to fetch profile data. Please try again.',
+          );
+        }
+      } finally {
+        if (showLoading) setLoading(false);
+        setRefreshing(false);
       }
-    } catch (error) {
-      console.error('Failed to fetch user profile:', error);
-      // Don't show error alert on refresh, just log it
-      if (showLoading) {
-        Alert.alert('Error', 'Failed to fetch profile data. Please try again.');
-      }
-    } finally {
-      if (showLoading) setLoading(false);
-      setRefreshing(false);
-    }
-  }, [user]);
+    },
+    [user],
+  );
 
   // ADD: Pull-to-refresh handler
   const onRefresh = useCallback(async () => {
@@ -81,7 +88,7 @@ const Profile = ({navigation}) => {
     useCallback(() => {
       console.log('📱 Profile screen focused, refreshing data...');
       fetchUserProfile();
-    }, [fetchUserProfile])
+    }, [fetchUserProfile]),
   );
 
   // Keep the original useEffect as fallback
@@ -146,16 +153,13 @@ const Profile = ({navigation}) => {
       });
 
       // Upload to server using the correct base URL
-      const response = await fetch(
-        `${API_BASE_URL}/uploads/profile-image`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
+      const response = await fetch(`${API_BASE_URL}/uploads/profile-image`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: formData,
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -174,7 +178,6 @@ const Profile = ({navigation}) => {
       setTimeout(() => {
         fetchUserProfile(false);
       }, 1000);
-
     } catch (error) {
       console.error('Error uploading profile image:', error);
       Alert.alert(
@@ -189,6 +192,30 @@ const Profile = ({navigation}) => {
   const handleLogout = async () => {
     await logout();
     // Navigation will be handled by AppNavigator
+  };
+
+  // Add this function inside the Profile component
+  const requestNotificationPermission = async () => {
+    try {
+      const token = await fcmService.requestUserPermission();
+      if (token) {
+        Alert.alert(
+          'Success',
+          "Notification permission granted! You'll now receive important updates.",
+        );
+      } else {
+        Alert.alert(
+          'Permission Required',
+          'To receive notifications, please enable them in Settings > Apps > MedEvents > Notifications',
+        );
+      }
+    } catch (error) {
+      console.error('Error requesting permission:', error);
+      Alert.alert(
+        'Error',
+        'Failed to request notification permission. Please try again.',
+      );
+    }
   };
 
   // ... renderDocumentViewer function remains the same ...
@@ -315,16 +342,16 @@ const Profile = ({navigation}) => {
           onPress={onRefresh}
           style={styles.refreshButton}
           disabled={refreshing}>
-          <Icon 
-            name={refreshing ? "loading" : "refresh"} 
-            size={20} 
-            color={refreshing ? "#ccc" : "#2e7af5"} 
+          <Icon
+            name={refreshing ? 'loading' : 'refresh'}
+            size={20}
+            color={refreshing ? '#ccc' : '#2e7af5'}
           />
         </TouchableOpacity>
       </View>
 
       {/* UPDATED: Add RefreshControl to ScrollView */}
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         refreshControl={
           <RefreshControl
@@ -432,13 +459,13 @@ const Profile = ({navigation}) => {
                 <Text style={styles.sectionTitle}>My Documents</Text>
                 <TouchableOpacity
                   style={styles.addDocButton}
-                  onPress={() => 
+                  onPress={() =>
                     navigation.navigate('UploadDocuments', {
                       onDocumentUpload: () => {
                         // This callback will be called from UploadDocumentsScreen
                         console.log('📄 Document upload callback triggered');
                         fetchUserProfile(false);
-                      }
+                      },
                     })
                   }>
                   <Icon name="plus" size={16} color="#fff" />
@@ -502,9 +529,9 @@ const Profile = ({navigation}) => {
                   </Text>
                   <TouchableOpacity
                     style={styles.uploadDocsButton}
-                    onPress={() => 
+                    onPress={() =>
                       navigation.navigate('UploadDocuments', {
-                        onDocumentUpload: () => fetchUserProfile(false)
+                        onDocumentUpload: () => fetchUserProfile(false),
                       })
                     }>
                     <Text style={styles.uploadDocsText}>Upload Documents</Text>
@@ -566,9 +593,11 @@ const Profile = ({navigation}) => {
             <Icon name="chevron-right" size={24} color="#ccc" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
-            <Icon name="bell-outline" size={24} color="#2e7af5" />
-            <Text style={styles.menuText}>Notifications</Text>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={requestNotificationPermission}>
+            <Icon name="bell-ring" size={24} color="#2e7af5" />
+            <Text style={styles.menuText}>Enable Notifications</Text>
             <Icon name="chevron-right" size={24} color="#ccc" />
           </TouchableOpacity>
 
