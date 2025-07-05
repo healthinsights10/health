@@ -77,10 +77,25 @@ export const authService = {
 
   signup: async userData => {
     try {
-      // Make sure all fields from the form are included
+      console.log('🌐 API service signup called');
+      console.log('📤 Sending to:', `${API_URL}/auth/signup`);
+      console.log('📦 User data:', {
+        email: userData.email,
+        role: userData.role,
+        documentsCount: userData.documents?.length || 0
+      });
+      
       const response = await api.post('/auth/signup', userData);
+      
+      console.log('📥 API response received:', {
+        status: response.status,
+        data: response.data,
+        needsOTPVerification: response.data?.needsOTPVerification
+      });
+      
       return response.data;
     } catch (error) {
+      console.error('❌ API signup error:', error);
       throw error;
     }
   },
@@ -106,6 +121,45 @@ export const authService = {
     try {
       const response = await api.get(`/auth/verify-email?token=${token}`);
       return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // OTP verification method
+  verifyOTP: async (email, otp) => {
+    try {
+      const response = await api.post('/auth/verify-otp', { email, otp });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Resend OTP method
+  resendOTP: async (email) => {
+    try {
+      const response = await api.post('/auth/resend-otp', { email });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Add these missing methods:
+  getUserProfile: async (userId) => {
+    try {
+      const response = await api.get(`/user-profile/${userId}`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  getMyDocuments: async () => {
+    try {
+      const response = await api.get('/users/my-documents');
+      return response;
     } catch (error) {
       throw error;
     }
@@ -1262,3 +1316,6 @@ export const quizService = {
     }
   },
 };
+
+// Also export the api instance if needed elsewhere
+export default api;

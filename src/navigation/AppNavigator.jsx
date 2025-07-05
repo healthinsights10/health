@@ -18,6 +18,7 @@ import DoctorDetailsScreen from '../screens/DoctorDetailsScreen';
 import ChatScreen from '../screens/ChatScreen';
 import EventDetailsScreen from '../screens/EventDetailsScreen';
 import EmailVerificationScreen from '../screens/EmailVerificationScreen';
+import OTPVerificationScreen from '../screens/OTPVerificationScreen';
 // Import regular user flow
 import BottomTabNavigator from './BottomTabNavigator';
 import Profile from '../screens/Profile';
@@ -161,7 +162,15 @@ const AdminNavigator = () => {
 const AppNavigator = () => {
   const {isAuthenticated, loading, user} = useAuth();
 
+  console.log('🧭 AppNavigator state:', {
+    isAuthenticated,
+    loading,
+    userRole: user?.role,
+    userEmail: user?.email
+  });
+
   if (loading) {
+    console.log('🧭 AppNavigator showing loading screen');
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#2e7af5" />
@@ -171,6 +180,12 @@ const AppNavigator = () => {
 
   // Check if the authenticated user is an admin
   const isAdmin = user?.role === 'admin';
+
+  console.log('🧭 AppNavigator rendering:', {
+    isAuthenticated,
+    isAdmin,
+    initialRoute: isAuthenticated ? (isAdmin ? 'AdminFlow' : 'MainApp') : 'Splash'
+  });
 
   return (
     <Stack.Navigator
@@ -233,6 +248,13 @@ const AppNavigator = () => {
               name="MeetingInvitations"
               component={MeetingInvitationsScreen}
             />
+            <Stack.Screen
+            name="OTPVerification"
+            component={OTPVerificationScreen}
+            options={{
+              headerShown: false,
+            }}
+          />
 
             {/* Only show course screens for non-pharma users */}
             {user?.role !== 'pharma' && (
@@ -272,6 +294,7 @@ const AppNavigator = () => {
                 headerShown: false,
               }}
             />
+            
           </>
         )
       ) : (
@@ -283,6 +306,13 @@ const AppNavigator = () => {
           <Stack.Screen name="SignUp" component={SignUpScreen} />
           <Stack.Screen name="AdminLogin" component={AdminLoginScreen} />
           <Stack.Screen name="AdminSignUp" component={AdminSignUpScreen} />
+          <Stack.Screen
+            name="OTPVerification"
+            component={OTPVerificationScreen}
+            options={{
+              headerShown: false,
+            }}
+          />
           <Stack.Screen
             name="EmailVerification"
             component={EmailVerificationScreen}

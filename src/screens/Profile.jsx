@@ -15,10 +15,13 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {useAuth} from '../context/AuthContext';
-import api from '../services/api';
+import {authService} from '../services/api'; // FIXED: Use named import
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import * as ImagePicker from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// ADD THIS CONSTANT AT THE TOP
+const API_BASE_URL = 'http://192.168.1.4:5000/api';
 
 const Profile = ({navigation}) => {
   const {user, logout} = useAuth();
@@ -41,7 +44,7 @@ const Profile = ({navigation}) => {
       setLoading(true);
 
       // Fetch updated user profile - USE CORRECT ENDPOINT
-      const userResponse = await api.get(`/user-profile/${user.id}`);
+      const userResponse = await authService.getUserProfile(user.id); // FIXED: Use authService method
 
       if (userResponse.data && userResponse.data.avatar_url) {
         setProfileImage(userResponse.data.avatar_url);
@@ -49,7 +52,7 @@ const Profile = ({navigation}) => {
 
       // Fetch documents if user is a doctor
       if (user?.role === 'doctor') {
-        const docResponse = await api.get(`/users/my-documents`);
+        const docResponse = await authService.getMyDocuments(); // FIXED: Use authService method
         setUserDocuments(docResponse.data || []);
       }
     } catch (error) {
@@ -91,7 +94,7 @@ const Profile = ({navigation}) => {
     });
   };
 
-  // Function to upload the selected profile image
+  // FIXED: Function to upload the selected profile image
   const uploadProfileImage = async imageFile => {
     if (!imageFile) return;
 
@@ -119,9 +122,9 @@ const Profile = ({navigation}) => {
         name: imageFile.name,
       });
 
-      // Upload to server - FIX THE URL HERE
+      // FIXED: Upload to server using the correct base URL
       const response = await fetch(
-        `${api.defaults.baseURL}/uploads/profile-image`,
+        `${API_BASE_URL}/uploads/profile-image`,
         {
           method: 'POST',
           headers: {
@@ -154,13 +157,13 @@ const Profile = ({navigation}) => {
     }
   };
 
-  // Fetch doctor's documents
+  // FIXED: Fetch doctor's documents
   const fetchDocuments = async () => {
     if (user?.role !== 'doctor') return;
 
     try {
       setLoading(true);
-      const response = await api.get(`/users/my-documents`);
+      const response = await authService.getMyDocuments(); // FIXED: Use authService method
       setUserDocuments(response.data || []);
     } catch (error) {
       console.error('Failed to fetch documents:', error);
@@ -174,6 +177,7 @@ const Profile = ({navigation}) => {
       fetchDocuments();
     }
   }, [user]);
+
   const handleLogout = async () => {
     await logout();
     // Navigation will be handled by AppNavigator

@@ -62,8 +62,7 @@ export const AuthProvider = ({children}) => {
           }
         }, 1000);
 
-        setUser(user);
-        setIsAuthenticated(true);
+        setUser(user); // This sets the user as authenticated
         return true;
       } else {
         throw new Error('Invalid response from server');
@@ -77,17 +76,46 @@ export const AuthProvider = ({children}) => {
     }
   };
 
-  // Modified signup to handle admin signup
+  // Update the signup method in AuthContext:
   const signup = async userData => {
     try {
+      console.log('🔐 AuthContext signup called with:', {
+        email: userData.email,
+        role: userData.role,
+        documentsCount: userData.documents?.length || 0
+      });
+      
       setError(null);
-      setLoading(true);
-      await authService.signup(userData);
+      // DON'T SET LOADING TO TRUE FOR SIGNUP - this is the fix!
+      // setLoading(true); // Remove this line
+      
+      const response = await authService.signup(userData);
+      
+      console.log('✅ AuthContext signup response received:', {
+        needsOTPVerification: response?.needsOTPVerification,
+        email: response?.email,
+        message: response?.message
+      });
+      
+      // Don't set user as authenticated yet if OTP verification is needed
+      if (!response.needsOTPVerification) {
+        // Old flow - user is registered and verified
+        if (response.user && response.token) {
+          await AsyncStorage.setItem('@token', response.token);
+          await AsyncStorage.setItem('@user', JSON.stringify(response.user));
+          authService.setAuthToken(response.token);
+          setUser(response.user); // This sets the user as authenticated
+        }
+      }
+      
+      return response; // Make sure this returns the full response
     } catch (error) {
+      console.error('❌ AuthContext signup error:', error);
       setError(error.message || 'Signup failed');
       throw error;
     } finally {
-      setLoading(false);
+      // Don't set loading to false either for signup
+      // setLoading(false); // Remove this line
     }
   };
 
@@ -122,7 +150,7 @@ export const AuthProvider = ({children}) => {
       await AsyncStorage.removeItem('@token');
       await AsyncStorage.removeItem('@user');
       await AsyncStorage.removeItem('fcmToken');
-      setUser(null);
+      setUser(null); // This logs the user out
     } catch (error) {
       console.error('Logout failed', error);
     } finally {
@@ -144,6 +172,7 @@ export const AuthProvider = ({children}) => {
       setLoading(false);
     }
   };
+
   const getToken = async () => {
     try {
       // Try AsyncStorage first
@@ -167,6 +196,38 @@ export const AuthProvider = ({children}) => {
       return null;
     }
   };
+
+  // FIXED: Add this method to your AuthProvider (removed setIsAuthenticated calls):
+  const verifyOTP = async (email, otp) => {
+    try {
+      setError(null);
+      setLoading(true);
+      
+      const response = await authService.verifyOTP(email, otp);
+      
+      if (response.success && response.user && response.token) {
+        // Store auth data
+        await AsyncStorage.setItem('@token', response.token);
+        await AsyncStorage.setItem('@user', JSON.stringify(response.user));
+        
+        // Set auth token for future requests
+        authService.setAuthToken(response.token);
+        
+        // Set user as authenticated (this replaces setIsAuthenticated(true))
+        setUser(response.user);
+        
+        return response;
+      }
+      
+      return response;
+    } catch (error) {
+      setError(error.message || 'OTP verification failed');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -177,8 +238,9 @@ export const AuthProvider = ({children}) => {
         signup,
         logout,
         getToken,
-        resendVerification, // Add this line
-        isAuthenticated: !!user,
+        resendVerification,
+        verifyOTP,
+        isAuthenticated: !!user, // This is computed from user state
       }}>
       {children}
     </AuthContext.Provider>

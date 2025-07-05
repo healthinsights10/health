@@ -238,7 +238,7 @@ const SignUpScreen = ({navigation}) => {
     }
 
     try {
-      setIsSubmitting(true);
+      setIsSubmitting(true); // Use local loading state
 
       // First, prepare and upload the documents to get their URLs
       let documentData = [];
@@ -263,7 +263,6 @@ const SignUpScreen = ({navigation}) => {
 
             console.log('Uploading document to:', `${API_BASE_URL}/uploads/temp-document`);
 
-            // Use the constant instead of api.defaults.baseURL
             const response = await fetch(
               `${API_BASE_URL}/uploads/temp-document`,
               {
@@ -305,7 +304,6 @@ const SignUpScreen = ({navigation}) => {
         password,
         role,
         phone,
-        // Include uploaded documents data in the signup request
         documents: documentData,
       };
 
@@ -324,19 +322,33 @@ const SignUpScreen = ({navigation}) => {
       });
 
       // Register the user with documents included
-      await signup(userData);
+      const response = await signup(userData);
 
-      // Show success message with instructions to verify email
-      Alert.alert(
-        'Registration Complete!',
-        'Your account has been created and your documents have been submitted. Please check your email to verify your account before logging in.',
-        [
-          {
-            text: 'Go to Login',
-            onPress: () => navigation.replace('Login'),
-          },
-        ],
-      );
+      console.log('Signup response:', response);
+      console.log('needsOTPVerification:', response?.needsOTPVerification);
+
+      // IMPORTANT: Navigation should happen immediately after successful response
+      if (response && response.needsOTPVerification === true) {
+        console.log('✅ Navigating to OTP verification...');
+        
+        // Use replace instead of navigate to prevent back navigation issues
+        navigation.replace('OTPVerification', {
+          email: email,
+          userName: name,
+        });
+      } else {
+        console.log('No OTP verification needed, showing fallback alert');
+        Alert.alert(
+          'Registration Complete!',
+          'Your account has been created. Please check your email to verify your account.',
+          [
+            {
+              text: 'Go to Login',
+              onPress: () => navigation.replace('Login'),
+            },
+          ],
+        );
+      }
     } catch (error) {
       console.error('Signup error:', error);
       
@@ -361,7 +373,7 @@ const SignUpScreen = ({navigation}) => {
       
       Alert.alert('Signup Failed', errorMessage);
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false); // Use local loading state
     }
   };
 
