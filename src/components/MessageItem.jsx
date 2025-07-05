@@ -77,30 +77,101 @@ const MessageItem = ({message, currentUserId, onAttachmentPress}) => {
     );
   };
 
-  // Add this function to handle link press with better error handling
+  // FIXED: Enhanced function to handle link press with web URL conversion
   const handleLinkPress = async (url) => {
     try {
-      console.log('Attempting to open URL:', url);
+      console.log('🔗 Attempting to open URL:', url);
+      
+      // FIXED: Check if it's a MedEvents web URL and convert to deep link
+      if (url.includes('medevent-event-sharing.vercel.app')) {
+        const convertedUrl = convertWebUrlToDeepLink(url);
+        console.log('🔄 Converted URL:', convertedUrl);
+        
+        // Try to open the deep link first
+        const canOpenDeepLink = await Linking.canOpenURL(convertedUrl);
+        
+        if (canOpenDeepLink) {
+          await Linking.openURL(convertedUrl);
+          console.log('✅ Deep link opened successfully');
+          return;
+        } else {
+          console.log('⚠️ Deep link not supported, trying web URL');
+          // Fallback to web URL
+          await Linking.openURL(url);
+          console.log('✅ Web URL opened successfully');
+          return;
+        }
+      }
+      
+      // For other URLs, check if they're supported
       const supported = await Linking.canOpenURL(url);
       
       if (supported) {
         await Linking.openURL(url);
-        console.log('URL opened successfully');
+        console.log('✅ URL opened successfully');
       } else {
-        console.log('URL not supported:', url);
+        console.log('❌ URL not supported:', url);
         Alert.alert(
           'Cannot Open Link',
-          'This link cannot be opened on your device.',
-          [{ text: 'OK' }]
+          'This link cannot be opened on your device. Would you like to copy the link?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Copy Link', 
+              onPress: () => copyToClipboard(url) 
+            }
+          ]
         );
       }
     } catch (error) {
-      console.error('Error opening URL:', error);
+      console.error('❌ Error opening URL:', error);
       Alert.alert(
-        'Error',
-        'Failed to open the link. Please try again.',
-        [{ text: 'OK' }]
+        'Error Opening Link',
+        'Failed to open the link. Would you like to copy it instead?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Copy Link', 
+            onPress: () => copyToClipboard(url) 
+          }
+        ]
       );
+    }
+  };
+
+  // ADDED: Function to convert web URLs to deep links
+  const convertWebUrlToDeepLink = (webUrl) => {
+    try {
+      // Extract the path from the web URL
+      const url = new URL(webUrl);
+      const path = url.pathname; // e.g., "/meeting/cff2688c-f04e-4d08-9ee0-2265125cbd41"
+      
+      // Convert to deep link format
+      if (path.startsWith('/meeting/')) {
+        const meetingId = path.split('/meeting/')[1];
+        return `medevents://meeting/${meetingId}`;
+      } else if (path.startsWith('/event/')) {
+        const eventId = path.split('/event/')[1];
+        return `medevents://event/${eventId}`;
+      }
+      
+      // For other paths, return the original URL
+      return webUrl;
+    } catch (error) {
+      //console.error('Error converting URL:', error);
+      return webUrl;
+    }
+  };
+
+  // ADDED: Function to copy URL to clipboard
+  const copyToClipboard = async (url) => {
+    try {
+      const { Clipboard } = require('@react-native-clipboard/clipboard');
+      await Clipboard.setString(url);
+      Alert.alert('Success', 'Link copied to clipboard!');
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+      Alert.alert('Error', 'Failed to copy link to clipboard');
     }
   };
 
@@ -182,6 +253,7 @@ const MessageItem = ({message, currentUserId, onAttachmentPress}) => {
   );
 };
 
+// UPDATED: Enhanced styles with better link styling
 const styles = StyleSheet.create({
   messageContainer: {
     marginVertical: 4,
@@ -217,10 +289,12 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 16,
     color: '#333',
+    lineHeight: 22,
   },
   linkText: {
     color: '#2e7af5',
     textDecorationLine: 'underline',
+    fontWeight: '500',
   },
   timestamp: {
     fontSize: 10,
