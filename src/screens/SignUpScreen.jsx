@@ -20,7 +20,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {api} from '../services/api';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-const API_BASE_URL = 'http://192.168.1.10:5000/api';
+// Use the same API URL as the auth service
+const API_BASE_URL = 'http://192.168.1.4:5000/api';
 
 const SignUpScreen = ({navigation}) => {
   const [step, setStep] = useState(1);
@@ -248,42 +249,52 @@ const SignUpScreen = ({navigation}) => {
           {text: 'OK'},
         ]);
 
-        // Upload documents to temporary storage first
-        for (const doc of documents) {
-          const formData = new FormData();
+        try {
+          // Upload documents to temporary storage first
+          for (const doc of documents) {
+            const formData = new FormData();
 
-          formData.append('document', {
-            uri:
-              Platform.OS === 'ios' ? doc.uri.replace('file://', '') : doc.uri,
-            type: doc.type || 'application/octet-stream',
-            name: doc.name || `file-${Date.now()}.${doc.uri.split('.').pop()}`,
-          });
+            formData.append('document', {
+              uri:
+                Platform.OS === 'ios' ? doc.uri.replace('file://', '') : doc.uri,
+              type: doc.type || 'application/octet-stream',
+              name: doc.name || `file-${Date.now()}.${doc.uri.split('.').pop()}`,
+            });
 
-          // Use the constant instead of api.defaults.baseURL
-          const response = await fetch(
-            `${API_BASE_URL}/uploads/temp-document`,
-            {
-              method: 'POST',
-              body: formData,
-            },
-          );
+            console.log('Uploading document to:', `${API_BASE_URL}/uploads/temp-document`);
 
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(
-              `Document upload failed: ${response.status} ${errorText}`,
+            // Use the constant instead of api.defaults.baseURL
+            const response = await fetch(
+              `${API_BASE_URL}/uploads/temp-document`,
+              {
+                method: 'POST',
+                body: formData,
+                headers: {
+                  'Content-Type': 'multipart/form-data',
+                },
+              },
             );
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(
+                `Document upload failed: ${response.status} ${errorText}`,
+              );
+            }
+
+            const result = await response.json();
+
+            documentData.push({
+              name: doc.name,
+              type: doc.type,
+              size: doc.size,
+              url: result.url,
+              storage_path: result.storage_path,
+            });
           }
-
-          const result = await response.json();
-
-          documentData.push({
-            name: doc.name,
-            type: doc.type,
-            size: doc.size,
-            url: result.url,
-            storage_path: result.storage_path,
-          });
+        } catch (uploadError) {
+          console.error('Document upload error:', uploadError);
+          throw new Error(`Document upload failed: ${uploadError.message}`);
         }
       }
 
@@ -308,6 +319,7 @@ const SignUpScreen = ({navigation}) => {
 
       console.log('Sending user data for registration:', {
         ...userData,
+        password: '***',
         documents: `${documentData.length} documents`,
       });
 
@@ -327,7 +339,27 @@ const SignUpScreen = ({navigation}) => {
       );
     } catch (error) {
       console.error('Signup error:', error);
-      Alert.alert('Signup Failed', error.message || 'Please try again later');
+      
+      // Provide more specific error messages
+      let errorMessage = 'Please try again later';
+      
+      if (error.message.includes('Network request failed')) {
+        errorMessage = 'Network connection failed. Please check your internet connection and server status.';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = 'Request timed out. Please check your internet connection and try again.';
+      } else if (error.message.includes('Document upload failed')) {
+        errorMessage = error.message;
+      } else if (error.response?.status === 400) {
+        errorMessage = error.response?.data?.message || 'Invalid user data provided';
+      } else if (error.response?.status === 409) {
+        errorMessage = 'An account with this email already exists';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Server error. Please try again later.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Signup Failed', errorMessage);
     } finally {
       setIsSubmitting(false);
     }

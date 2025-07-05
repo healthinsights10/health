@@ -76,7 +76,8 @@ const DoctorManagementScreen = ({navigation}) => {
   }, [searchQuery, doctors]);
 
   const handleViewDetails = doctorId => {
-    navigation.navigate('DoctorDetails', {doctorId});
+    // Navigate to the existing UserVerificationScreen
+    navigation.navigate('UserVerification');
   };
 
   const renderDoctorItem = ({item}) => (
