@@ -740,7 +740,15 @@ export const eventService = {
 
 // User services
 export const userService = {
-  // Get current user's documents
+  uploadDocuments: async (documentsData) => {
+    try {
+      const response = await api.post('/users/documents', { documents: documentsData });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   getMyDocuments: async () => {
     try {
       const response = await api.get('/users/my-documents');
@@ -750,20 +758,17 @@ export const userService = {
     }
   },
 
-  // Upload new documents
-  uploadDocuments: async documents => {
+  // ADD THIS NEW METHOD for fetching user profile
+  getUserProfile: async (userId) => {
     try {
-      const response = await api.post('/users/documents', {documents});
+      const response = await api.get(`/user-profile/${userId}`);
       return response.data;
     } catch (error) {
       throw error;
     }
   },
-};
 
-// Private Meetings API methods
-export const meetingService = {
-  // Create a new private meeting
+  // Private Meetings API methods
   createPrivateMeeting: async meetingData => {
     try {
       // Ensure we have an organizer name

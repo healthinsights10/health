@@ -12,17 +12,20 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import * as ImagePicker from 'react-native-image-picker';
 import RNFS from 'react-native-fs';
-// import {userService} from '../services/api';
 import WebViewDocumentPicker from '../components/WebViewDocumentPicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Platform} from 'react-native';
-import api, {userService} from '../services/api';
+import {userService} from '../services/api';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+
+const API_BASE_URL = 'http://192.168.1.4:5000/api';
+
 const UploadDocumentsScreen = ({navigation}) => {
   const [documents, setDocuments] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [webViewPickerVisible, setWebViewPickerVisible] = useState(false);
   const insets = useSafeAreaInsets();
+
   const pickDocument = () => {
     setWebViewPickerVisible(true);
   };
@@ -96,8 +99,6 @@ const UploadDocumentsScreen = ({navigation}) => {
     });
   };
 
-  // In handleUploadDocuments function
-
   const handleUploadDocuments = async () => {
     if (documents.length === 0) {
       Alert.alert('Error', 'Please select at least one document to upload');
@@ -110,40 +111,90 @@ const UploadDocumentsScreen = ({navigation}) => {
       const uploadedDocs = [];
       const token = await getAuthToken();
 
+      if (!token) {
+        Alert.alert('Error', 'Authentication token not found. Please login again.');
+        return;
+      }
+
       for (const doc of documents) {
-        console.log(`Uploading document: ${doc.name}`);
+        console.log(`📤 Uploading document: ${doc.name}`);
 
-        // Create form data
+        // Validate file before upload
+        if (!doc.uri || !doc.name) {
+          console.error('❌ Invalid document data:', doc);
+          throw new Error(`Invalid document: ${doc.name || 'unknown'}`);
+        }
+
+        // Create form data using XMLHttpRequest for better compatibility
         const formData = new FormData();
-
-        // Add file to form data
         formData.append('document', {
           uri: Platform.OS === 'ios' ? doc.uri.replace('file://', '') : doc.uri,
           type: doc.type || 'application/octet-stream',
           name: doc.name || `file-${Date.now()}.${doc.uri.split('.').pop()}`,
         });
 
-        // Upload to our server endpoint
-        const response = await fetch(
-          `${api.defaults.baseURL}/uploads/document`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              // Don't set Content-Type for multipart/form-data
-            },
-            body: formData,
-          },
-        );
+        // Use XMLHttpRequest for the upload with enhanced error handling
+        const result = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Upload failed:', errorText);
-          throw new Error(`Upload failed: ${response.status} ${errorText}`);
+          // Set timeout
+          xhr.timeout = 300000; // 5 minutes
+
+          xhr.open('POST', `${API_BASE_URL}/uploads/document`);
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          
+          // Don't set Content-Type - let XMLHttpRequest set it with boundary
+
+          xhr.onload = function() {
+            console.log(`📥 Upload response: ${xhr.status} ${xhr.statusText}`);
+            
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const response = JSON.parse(xhr.responseText);
+                console.log('✅ Upload successful:', response);
+                resolve(response);
+              } catch (e) {
+                console.error('❌ Invalid JSON response:', xhr.responseText);
+                reject(new Error(`Invalid server response: ${xhr.responseText.substring(0, 200)}`));
+              }
+            } else {
+              console.error('❌ Upload failed:', xhr.status, xhr.responseText);
+              reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+            }
+          };
+
+          xhr.onerror = function() {
+            console.error('❌ Network error during upload');
+            reject(new Error('Network error occurred during upload. Please check your internet connection.'));
+          };
+
+          xhr.ontimeout = function() {
+            console.error('❌ Upload timeout');
+            reject(new Error('Upload timed out. Please try again with a smaller file.'));
+          };
+
+          xhr.onabort = function() {
+            console.error('❌ Upload aborted');
+            reject(new Error('Upload was cancelled.'));
+          };
+
+          // Add upload progress logging
+          xhr.upload.onprogress = function(event) {
+            if (event.lengthComputable) {
+              const percentComplete = (event.loaded / event.total) * 100;
+              console.log(`📊 Upload progress: ${percentComplete.toFixed(1)}%`);
+            }
+          };
+
+          xhr.send(formData);
+        });
+
+        console.log('📋 Processing upload result:', result);
+
+        // Validate the response
+        if (!result.success || !result.url) {
+          throw new Error(`Invalid upload response for ${doc.name}`);
         }
-
-        const result = await response.json();
-        console.log('Upload result:', result);
 
         // Create document object with Supabase URL and storage path
         uploadedDocs.push({
@@ -159,6 +210,7 @@ const UploadDocumentsScreen = ({navigation}) => {
 
       // Upload the documents to user profile
       if (uploadedDocs.length > 0) {
+        console.log('💾 Saving document references...');
         await userService.uploadDocuments(uploadedDocs);
 
         Alert.alert('Success', 'Documents uploaded successfully', [
@@ -166,13 +218,21 @@ const UploadDocumentsScreen = ({navigation}) => {
         ]);
       }
     } catch (error) {
-      console.error('Error uploading documents:', error);
-      Alert.alert(
-        'Upload Failed',
-        `${
-          error.message || 'Please try again later'
-        }\n\nCheck your network connection and server status.`,
-      );
+      console.error('❌ Error uploading documents:', error);
+      
+      let errorMessage = 'Failed to upload documents. Please try again.';
+      
+      if (error.message.includes('Network error')) {
+        errorMessage = 'Network connection failed. Please check your internet connection and try again.';
+      } else if (error.message.includes('timeout') || error.message.includes('timed out')) {
+        errorMessage = 'Upload timed out. Please try again with a smaller file or better internet connection.';
+      } else if (error.message.includes('File too large')) {
+        errorMessage = 'One or more files are too large. Maximum file size is 50MB.';
+      } else if (error.message.includes('Invalid upload response')) {
+        errorMessage = 'Server error during upload. Please try again later.';
+      }
+      
+      Alert.alert('Upload Failed', errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -262,7 +322,10 @@ const UploadDocumentsScreen = ({navigation}) => {
         <TouchableOpacity
           style={[
             styles.uploadButton,
-            {marginTop: 20, backgroundColor: '#2e7af5'},
+            {
+              marginTop: 20,
+              backgroundColor: documents.length > 0 ? '#2e7af5' : '#ccc',
+            },
           ]}
           onPress={handleUploadDocuments}
           disabled={isSubmitting || documents.length === 0}>

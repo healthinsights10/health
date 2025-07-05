@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,13 +12,15 @@ import {
   Linking,
   Alert,
   Platform,
+  RefreshControl, // ADD THIS IMPORT
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {useAuth} from '../context/AuthContext';
-import {authService} from '../services/api'; // FIXED: Use named import
+import {authService, userService} from '../services/api'; // ADD userService import
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import * as ImagePicker from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {useFocusEffect} from '@react-navigation/native'; // ADD THIS IMPORT
 
 // ADD THIS CONSTANT AT THE TOP
 const API_BASE_URL = 'http://192.168.1.4:5000/api';
@@ -27,46 +29,67 @@ const Profile = ({navigation}) => {
   const {user, logout} = useAuth();
   const [userDocuments, setUserDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false); // ADD THIS STATE
   const [viewingDocument, setViewingDocument] = useState(null);
   const [profileImage, setProfileImage] = useState(user?.avatar_url || null);
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const insets = useSafeAreaInsets();
 
-  // Fetch user profile with document and avatar
-  const fetchUserProfile = async () => {
+  // UPDATED: Fetch user profile with document and avatar
+  const fetchUserProfile = useCallback(async (showLoading = true) => {
     try {
-      // Add check to ensure user exists before accessing properties
       if (!user) {
         console.log('User data not available yet');
-        return; // Exit early if user is null
+        return;
       }
 
-      setLoading(true);
+      if (showLoading) setLoading(true);
 
-      // Fetch updated user profile - USE CORRECT ENDPOINT
-      const userResponse = await authService.getUserProfile(user.id); // FIXED: Use authService method
+      // Fetch updated user profile
+      const userResponse = await userService.getUserProfile(user.id);
 
-      if (userResponse.data && userResponse.data.avatar_url) {
-        setProfileImage(userResponse.data.avatar_url);
+      if (userResponse && userResponse.avatar_url) {
+        setProfileImage(userResponse.avatar_url);
       }
 
       // Fetch documents if user is a doctor
       if (user?.role === 'doctor') {
-        const docResponse = await authService.getMyDocuments(); // FIXED: Use authService method
-        setUserDocuments(docResponse.data || []);
+        const docResponse = await userService.getMyDocuments();
+        console.log('📄 Documents fetched:', docResponse?.length || 0);
+        setUserDocuments(docResponse || []);
       }
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
+      // Don't show error alert on refresh, just log it
+      if (showLoading) {
+        Alert.alert('Error', 'Failed to fetch profile data. Please try again.');
+      }
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [user]);
 
+  // ADD: Pull-to-refresh handler
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchUserProfile(false); // false = don't show loading spinner
+  }, [fetchUserProfile]);
+
+  // UPDATED: Use useFocusEffect for auto-refresh when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      console.log('📱 Profile screen focused, refreshing data...');
+      fetchUserProfile();
+    }, [fetchUserProfile])
+  );
+
+  // Keep the original useEffect as fallback
   useEffect(() => {
     if (user) {
       fetchUserProfile();
     }
-  }, [user]);
+  }, [user, fetchUserProfile]);
 
   // Function to pick an image from gallery
   const pickProfileImage = () => {
@@ -94,7 +117,7 @@ const Profile = ({navigation}) => {
     });
   };
 
-  // FIXED: Function to upload the selected profile image
+  // UPDATED: Function to upload the selected profile image with instant update
   const uploadProfileImage = async imageFile => {
     if (!imageFile) return;
 
@@ -122,7 +145,7 @@ const Profile = ({navigation}) => {
         name: imageFile.name,
       });
 
-      // FIXED: Upload to server using the correct base URL
+      // Upload to server using the correct base URL
       const response = await fetch(
         `${API_BASE_URL}/uploads/profile-image`,
         {
@@ -141,11 +164,17 @@ const Profile = ({navigation}) => {
 
       const result = await response.json();
 
-      // Update profile image state
+      // INSTANT UPDATE: Update profile image state immediately
       setProfileImage(result.avatar_url);
 
       // Show success message
       Alert.alert('Success', 'Profile picture updated successfully');
+
+      // OPTIONAL: Refresh profile data in background to sync with server
+      setTimeout(() => {
+        fetchUserProfile(false);
+      }, 1000);
+
     } catch (error) {
       console.error('Error uploading profile image:', error);
       Alert.alert(
@@ -157,32 +186,12 @@ const Profile = ({navigation}) => {
     }
   };
 
-  // FIXED: Fetch doctor's documents
-  const fetchDocuments = async () => {
-    if (user?.role !== 'doctor') return;
-
-    try {
-      setLoading(true);
-      const response = await authService.getMyDocuments(); // FIXED: Use authService method
-      setUserDocuments(response.data || []);
-    } catch (error) {
-      console.error('Failed to fetch documents:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (user?.role === 'doctor') {
-      fetchDocuments();
-    }
-  }, [user]);
-
   const handleLogout = async () => {
     await logout();
     // Navigation will be handled by AppNavigator
   };
 
+  // ... renderDocumentViewer function remains the same ...
   const renderDocumentViewer = () => {
     if (!viewingDocument) return null;
 
@@ -301,10 +310,30 @@ const Profile = ({navigation}) => {
           <Icon name="arrow-left" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Profile</Text>
-        <View style={{width: 24}} />
+        {/* ADD: Refresh button in header */}
+        <TouchableOpacity
+          onPress={onRefresh}
+          style={styles.refreshButton}
+          disabled={refreshing}>
+          <Icon 
+            name={refreshing ? "loading" : "refresh"} 
+            size={20} 
+            color={refreshing ? "#ccc" : "#2e7af5"} 
+          />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
+      {/* UPDATED: Add RefreshControl to ScrollView */}
+      <ScrollView 
+        style={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#2e7af5']}
+            tintColor="#2e7af5"
+          />
+        }>
         <View style={styles.profileSection}>
           {/* Profile Image Section */}
           <TouchableOpacity
@@ -397,19 +426,27 @@ const Profile = ({navigation}) => {
               </TouchableOpacity>
             </View>
 
-            {/* Add Documents Section */}
+            {/* UPDATED: Documents Section with instant refresh */}
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeaderRow}>
                 <Text style={styles.sectionTitle}>My Documents</Text>
                 <TouchableOpacity
                   style={styles.addDocButton}
-                  onPress={() => navigation.navigate('UploadDocuments')}>
+                  onPress={() => 
+                    navigation.navigate('UploadDocuments', {
+                      onDocumentUpload: () => {
+                        // This callback will be called from UploadDocumentsScreen
+                        console.log('📄 Document upload callback triggered');
+                        fetchUserProfile(false);
+                      }
+                    })
+                  }>
                   <Icon name="plus" size={16} color="#fff" />
                   <Text style={styles.addDocText}>Add Document</Text>
                 </TouchableOpacity>
               </View>
 
-              {loading ? (
+              {loading && userDocuments.length === 0 ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="small" color="#2e7af5" />
                   <Text style={styles.loadingText}>Loading documents...</Text>
@@ -418,7 +455,7 @@ const Profile = ({navigation}) => {
                 <>
                   {userDocuments.map((doc, index) => (
                     <TouchableOpacity
-                      key={index}
+                      key={`${doc.id || index}-${doc.name}`} // Better key for re-renders
                       style={styles.documentItem}
                       onPress={() => setViewingDocument(doc)}>
                       <Icon
@@ -439,33 +476,21 @@ const Profile = ({navigation}) => {
                             : 'Unknown date'}
                         </Text>
                       </View>
-                      {/* <View
+                      <View
                         style={[
                           styles.documentBadge,
                           {
                             backgroundColor: doc.verified
                               ? '#e8f5e9'
                               : '#fff3e0',
-                            paddingHorizontal: 8,
-                            width: 'auto',
-                            height: 'auto',
                           },
                         ]}>
                         <Icon
                           name={doc.verified ? 'check-circle' : 'clock-outline'}
                           size={12}
                           color={doc.verified ? '#2e7d32' : '#e65100'}
-                          style={{marginRight: 4}}
                         />
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            color: doc.verified ? '#2e7d32' : '#e65100',
-                            fontWeight: '500',
-                          }}>
-                          {doc.verified ? 'Verified' : 'Pending'}
-                        </Text>
-                      </View> */}
+                      </View>
                     </TouchableOpacity>
                   ))}
                 </>
@@ -477,7 +502,11 @@ const Profile = ({navigation}) => {
                   </Text>
                   <TouchableOpacity
                     style={styles.uploadDocsButton}
-                    onPress={() => navigation.navigate('UploadDocuments')}>
+                    onPress={() => 
+                      navigation.navigate('UploadDocuments', {
+                        onDocumentUpload: () => fetchUserProfile(false)
+                      })
+                    }>
                     <Text style={styles.uploadDocsText}>Upload Documents</Text>
                   </TouchableOpacity>
                 </View>
@@ -585,6 +614,7 @@ const Profile = ({navigation}) => {
   );
 };
 
+// ADD: New style for refresh button
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -903,6 +933,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '500',
     marginLeft: 8,
+  },
+  refreshButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
   },
 });
 
