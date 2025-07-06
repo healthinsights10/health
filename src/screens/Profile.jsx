@@ -24,7 +24,7 @@ import {useFocusEffect} from '@react-navigation/native'; // ADD THIS IMPORT
 import fcmService from '../services/fcmService'; // Import fcmService
 
 // ADD THIS CONSTANT AT THE TOP
-const API_BASE_URL = 'http://192.168.1.4:5000/api';
+const API_BASE_URL = 'https://health-server-bw3x.onrender.com/api';
 
 const Profile = ({navigation}) => {
   const {user, logout} = useAuth();

@@ -119,95 +119,105 @@ const AdminQuizScreen = ({ route, navigation }) => {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.content}>
-          <Text style={styles.eventTitle}>{eventTitle}</Text>
-          <Text style={styles.subtitle}>
-            Create quiz questions for this event
-          </Text>
+  <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
+    <ScrollView style={styles.scrollView}>
+      <View style={styles.content}>
+        <Text style={styles.eventTitle}>{eventTitle}</Text>
+        <Text style={styles.subtitle}>
+          Create quiz questions for this event
+        </Text>
 
-          {questions.map((question, index) => (
-            <View key={question.id} style={styles.questionContainer}>
-              <View style={styles.questionHeader}>
-                <Text style={styles.questionNumber}>Question {index + 1}</Text>
-                <View style={styles.questionActions}>
-                  <TouchableOpacity
-                    style={styles.typeToggle}
-                    onPress={() => toggleQuestionType(index)}>
-                    <Icon 
-                      name={question.type === 'multiple-choice' ? 'format-list-bulleted' : 'format-text'} 
-                      size={16} 
-                      color="#2e7af5" 
-                    />
-                    <Text style={styles.typeToggleText}>
-                      {question.type === 'multiple-choice' ? 'MCQ' : 'Text'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.removeButton}
-                    onPress={() => removeQuestion(index)}>
-                    <Icon name="close" size={20} color="#f44336" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <TextInput
-                style={styles.questionInput}
-                placeholder="Enter your question..."
-                value={question.question}
-                onChangeText={(text) => updateQuestion(index, 'question', text)}
-                multiline
-              />
-
-              {question.type === 'multiple-choice' ? (
-                <View style={styles.optionsContainer}>
-                  <Text style={styles.optionsLabel}>Options:</Text>
-                  {question.options.map((option, optionIndex) => (
-                    <View key={optionIndex} style={styles.optionRow}>
-                      <TextInput
-                        style={styles.optionInput}
-                        placeholder={`Option ${optionIndex + 1}`}
-                        value={option}
-                        onChangeText={(text) => updateOption(index, optionIndex, text)}
-                      />
-                      <TouchableOpacity
-                        style={[
-                          styles.correctButton,
-                          question.correctAnswer === option && styles.correctButtonSelected
-                        ]}
-                        onPress={() => updateQuestion(index, 'correctAnswer', option)}>
-                        <Icon 
-                          name={question.correctAnswer === option ? 'check-circle' : 'circle-outline'} 
-                          size={20} 
-                          color={question.correctAnswer === option ? '#4caf50' : '#ccc'} 
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <View style={styles.textAnswerContainer}>
-                  <Text style={styles.optionsLabel}>Correct Answer:</Text>
-                  <TextInput
-                    style={styles.textAnswerInput}
-                    placeholder="Enter the correct answer..."
-                    value={question.correctAnswer}
-                    onChangeText={(text) => updateQuestion(index, 'correctAnswer', text)}
-                    multiline
+        {questions.map((question, index) => (
+          <View key={question.id} style={styles.questionContainer}>
+            <View style={styles.questionHeader}>
+              <Text style={styles.questionNumber}>Question {index + 1}</Text>
+              <View style={styles.questionActions}>
+                <TouchableOpacity
+                  style={styles.typeToggle}
+                  onPress={() => toggleQuestionType(index)}>
+                  <Icon 
+                    name={question.type === 'multiple-choice' ? 'format-list-bulleted' : 'format-text'} 
+                    size={16} 
+                    color="#2e7af5" 
                   />
-                </View>
-              )}
+                  <Text style={styles.typeToggleText}>
+                    {question.type === 'multiple-choice' ? 'MCQ' : 'Text'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => removeQuestion(index)}>
+                  <Icon name="close" size={20} color="#f44336" />
+                </TouchableOpacity>
+              </View>
             </View>
-          ))}
 
-          <TouchableOpacity style={styles.addQuestionButton} onPress={addQuestion}>
-            <Icon name="plus-circle" size={24} color="#2e7af5" />
-            <Text style={styles.addQuestionText}>Add Question</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+            <TextInput
+              style={styles.questionInput}
+              placeholder="Enter your question..."
+              value={question.question}
+              onChangeText={(text) => updateQuestion(index, 'question', text)}
+              multiline
+            />
+
+            {question.type === 'multiple-choice' ? (
+              <View style={styles.optionsContainer}>
+                <Text style={styles.optionsLabel}>Options:</Text>
+                {question.options.map((option, optionIndex) => (
+                  <View key={optionIndex} style={styles.optionRow}>
+                    <TextInput
+                      style={styles.optionInput}
+                      placeholder={`Option ${optionIndex + 1}`}
+                      value={option}
+                      onChangeText={(text) => updateOption(index, optionIndex, text)}
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.correctButton,
+                        question.correctAnswer === option && styles.correctButtonSelected
+                      ]}
+                      onPress={() => updateQuestion(index, 'correctAnswer', option)}>
+                      <Icon 
+                        name={question.correctAnswer === option ? 'check-circle' : 'circle-outline'} 
+                        size={20} 
+                        color={question.correctAnswer === option ? '#4caf50' : '#ccc'} 
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.textAnswerContainer}>
+                <Text style={styles.optionsLabel}>Correct Answer:</Text>
+                <TextInput
+                  style={styles.textAnswerInput}
+                  placeholder="Enter the correct answer..."
+                  value={question.correctAnswer}
+                  onChangeText={(text) => updateQuestion(index, 'correctAnswer', text)}
+                  multiline
+                />
+              </View>
+            )}
+          </View>
+        ))}
+
+        <TouchableOpacity style={styles.addQuestionButton} onPress={addQuestion}>
+          <Icon name="plus-circle" size={24} color="#2e7af5" />
+          <Text style={styles.addQuestionText}>Add Question</Text>
+        </TouchableOpacity>
+        <View style={styles.header}>
+      <TouchableOpacity
+        style={styles.saveButton}
+        onPress={saveQuiz}
+        disabled={saving}>
+        <Text style={styles.saveButtonText}>
+          {saving ? 'Saving...' : 'Save Quiz'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+      </View>
+    </ScrollView>
+  </SafeAreaView>
   );
 };
 
@@ -219,11 +229,10 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
+    backgroundColor: '#f7f9fc',
     borderBottomColor: '#e1e1e1',
   },
   backButton: {
@@ -236,12 +245,15 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
+    backgroundColor: '#f7a1f4',
+    borderRadius: 8,
+    marginTop: 8,
   },
   saveButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2e7af5',
+    color: '#fff',
   },
   loadingContainer: {
     flex: 1,
