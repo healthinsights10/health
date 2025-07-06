@@ -71,17 +71,35 @@ const EventDetailsScreen = ({route, navigation}) => {
   }, [eventId]);
 
   const fetchEventDetails = async () => {
-    try {
-      setLoading(true);
-      const eventData = await eventService.getEventById(eventId);
-      setEvent(eventData);
-    } catch (error) {
-      console.error('Failed to load event details:', error);
-      Alert.alert('Error', 'Failed to load event details.');
-    } finally {
-      setLoading(false);
+  try {
+    setLoading(true);
+    const eventData = await eventService.getEventById(eventId);
+
+    // ADD: Enhanced debug logging for sponsors
+    console.log('📋 Event data received:', eventData);
+    console.log('📋 Event sponsors:', eventData.sponsors);
+    console.log('📋 Sponsors type:', typeof eventData.sponsors);
+    console.log('📋 Sponsors length:', eventData.sponsors?.length || 0);
+    
+    // Check if sponsors is a string (JSON) that needs parsing
+    if (typeof eventData.sponsors === 'string') {
+      try {
+        eventData.sponsors = JSON.parse(eventData.sponsors);
+        console.log('📋 Parsed sponsors:', eventData.sponsors);
+      } catch (error) {
+        console.error('❌ Failed to parse sponsors JSON:', error);
+        eventData.sponsors = [];
+      }
     }
-  };
+
+    setEvent(eventData);
+  } catch (error) {
+    console.error('Failed to load event details:', error);
+    Alert.alert('Error', 'Failed to load event details.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Add function to fetch registered events
   const fetchRegisteredEvents = async () => {
@@ -165,20 +183,90 @@ const EventDetailsScreen = ({route, navigation}) => {
     </View>
   );
 
-  // Render sponsor item
-  const renderSponsorItem = ({item}) => (
-    <View style={styles.sponsorCard}>
-      <Text style={styles.sponsorName}>
-        {/* Show name, company, or "Sponsor" if no name available */}
-        {item.name ||
-          item.company ||
-          (item.contactPerson ? `${item.contactPerson}'s Company` : 'Sponsor')}
-      </Text>
-      {item.level && (
-        <Text style={styles.sponsorLevel}>Level: {item.level}</Text>
-      )}
-    </View>
-  );
+  const renderSponsorItem = ({item}) => {
+    const sponsorName = 
+      item.name || 
+      item.company_name || 
+      item.contactPerson || 
+      item.pharma_name || 
+      'Unknown Sponsor';
+
+    const sponsorLevel = item.level || 'Standard';
+    const sponsorType = item.type || 'manual';
+    const isPharmaSponsor = sponsorType === 'pharma_company';
+
+    return (
+      <View style={styles.sponsorCard}>
+        <View style={styles.sponsorHeader}>
+          <Icon 
+            name={isPharmaSponsor ? 'domain' : 'handshake'} 
+            size={20} 
+            color="#2e7af5" 
+          />
+          <Text style={styles.sponsorName}>{sponsorName}</Text>
+        </View>
+
+        {item.contactPerson && item.contactPerson !== sponsorName && (
+          <View style={styles.sponsorDetail}>
+            <Icon name="account" size={14} color="#666" />
+            <Text style={styles.sponsorDetailText}>
+              {item.contactPerson}
+            </Text>
+          </View>
+        )}
+
+        {item.contactEmail && (
+          <View style={styles.sponsorDetail}>
+            <Icon name="email" size={14} color="#666" />
+            <Text style={styles.sponsorDetailText}>
+              {item.contactEmail}
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.sponsorFooter}>
+          <View style={[
+            styles.sponsorLevelBadge,
+            {
+              backgroundColor: 
+                sponsorLevel === 'Gold' ? '#fff3cd' :
+                sponsorLevel === 'Silver' ? '#f8f9fa' :
+                sponsorLevel === 'Bronze' ? '#ffeaa7' : '#e3f2fd'
+            }
+          ]}>
+            <Text style={[
+              styles.sponsorLevelText,
+              {
+                color: 
+                  sponsorLevel === 'Gold' ? '#856404' :
+                  sponsorLevel === 'Silver' ? '#495057' :
+                  sponsorLevel === 'Bronze' ? '#6c5ce7' : '#2e7af5'
+              }
+            ]}>
+              {sponsorLevel}
+            </Text>
+          </View>
+
+          <View style={[
+            styles.sponsorTypeBadge,
+            {backgroundColor: isPharmaSponsor ? '#e8f5e9' : '#fff3e0'}
+          ]}>
+            <Icon 
+              name={isPharmaSponsor ? 'medical-bag' : 'account-group'} 
+              size={12} 
+              color={isPharmaSponsor ? '#2e7d32' : '#f57c00'} 
+            />
+            <Text style={[
+              styles.sponsorTypeText,
+              {color: isPharmaSponsor ? '#2e7d32' : '#f57c00'}
+            ]}>
+              {isPharmaSponsor ? 'Pharma' : 'Manual'}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   // Add this helper function inside your component, before the return statement
   const handleOpenLink = url => {
@@ -228,34 +316,34 @@ const EventDetailsScreen = ({route, navigation}) => {
       });
   };
 
-const handleShareEvent = async () => {
-  try {
-    await sharingService.shareEvent(eventId, {
-      title: event.title,
-      description: event.description,
-      startDate: event.startDate,
-      mode: event.mode,
-      venue: event.venue
-    });
-  } catch (error) {
-    console.error('Failed to share event:', error);
-  }
-};
+  const handleShareEvent = async () => {
+    try {
+      await sharingService.shareEvent(eventId, {
+        title: event.title,
+        description: event.description,
+        startDate: event.startDate,
+        mode: event.mode,
+        venue: event.venue,
+      });
+    } catch (error) {
+      console.error('Failed to share event:', error);
+    }
+  };
 
-const handleShareMeeting = async () => {
-  try {
-    await sharingService.shareMeeting(eventId, {
-      title: event.title,
-      description: event.description,
-      date: event.startDate,
-      mode: event.mode,
-      venue: event.venue,
-      organizer: event.organizerName
-    });
-  } catch (error) {
-    console.error('Failed to share meeting:', error);
-  }
-};
+  const handleShareMeeting = async () => {
+    try {
+      await sharingService.shareMeeting(eventId, {
+        title: event.title,
+        description: event.description,
+        date: event.startDate,
+        mode: event.mode,
+        venue: event.venue,
+        organizer: event.organizerName,
+      });
+    } catch (error) {
+      console.error('Failed to share meeting:', error);
+    }
+  };
 
   if (loading) {
     return (
@@ -301,10 +389,9 @@ const handleShareMeeting = async () => {
           <Icon name="arrow-left" size={24} color="#2e7af5" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Event Details</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.headerActionButton}
-          onPress={handleShareMeeting}
-        >
+          onPress={handleShareMeeting}>
           <Icon name="share-variant" size={24} color="#2e7af5" />
         </TouchableOpacity>
       </View>
@@ -378,10 +465,12 @@ const handleShareMeeting = async () => {
               {/* Add this button in the action buttons section */}
               <TouchableOpacity
                 style={[styles.secondaryButton, {backgroundColor: '#ff85be'}]}
-                onPress={() => navigation.navigate('Quiz', { 
-                  eventId: event.id, 
-                  eventTitle: event.title 
-                })}>
+                onPress={() =>
+                  navigation.navigate('Quiz', {
+                    eventId: event.id,
+                    eventTitle: event.title,
+                  })
+                }>
                 <Icon name="help-circle" size={18} color="#fff" />
                 <Text style={[styles.secondaryButtonText, {color: '#fff'}]}>
                   Take Quiz
@@ -514,16 +603,28 @@ const handleShareMeeting = async () => {
           </View>
         )}
 
-        {/* Sponsors Section */}
+        {/* Sponsors Section - Clean UI */}
         {event.sponsors && event.sponsors.length > 0 && (
           <View style={styles.detailSection}>
-            <Text style={styles.sectionTitle}>Sponsors</Text>
+            <Text style={styles.sectionTitle}>
+              Event Sponsors ({event.sponsors.length})
+            </Text>
             <FlatList
               data={event.sponsors}
               renderItem={renderSponsorItem}
-              keyExtractor={item => item.id}
+              keyExtractor={(item, index) => {
+                return (
+                  item.id?.toString() ||
+                  item.pharma_id?.toString() ||
+                  item.name ||
+                  `sponsor-${index}`
+                );
+              }}
               scrollEnabled={false}
-              horizontal={true}
+              numColumns={2}
+              columnWrapperStyle={
+                event.sponsors.length > 1 ? styles.sponsorsRow : null
+              }
               contentContainerStyle={styles.sponsorsContainer}
             />
           </View>
@@ -839,99 +940,79 @@ const styles = StyleSheet.create({
   sponsorsContainer: {
     paddingVertical: 8,
   },
+  sponsorsRow: {
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   sponsorCard: {
-    padding: 12,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    marginRight: 12,
-    minWidth: 150,
-    alignItems: 'center',
-  },
-  sponsorName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  sponsorLevel: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  tag: {
-    backgroundColor: '#e3f2fd',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
     marginRight: 8,
+    flex: 1,
+    minWidth: 160,
+    maxWidth: '48%',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.07,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  sponsorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 8,
   },
-  tagText: {
-    color: '#2e7af5',
-    fontSize: 14,
-  },
-  bottomButtonContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: -2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  bottomButton: {
-    backgroundColor: '#2e7af5',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  bottomButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  brochureContainer: {
-    marginTop: 8,
-    marginBottom: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    overflow: 'hidden',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    shadowOffset: {width: 0, height: 1},
-  },
-  brochureTitle: {
-    fontSize: 16,
+  sponsorName: {
+    fontSize: 15,
     fontWeight: '600',
     color: '#333',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    marginLeft: 8,
+    flex: 1,
   },
-  joinLinkContainer: {
+  sponsorDetail: {
     flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  sponsorDetailText: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 6,
+    flex: 1,
+  },
+  sponsorFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 8,
   },
-  joinLinkText: {
-    color: '#2e7af5',
-    fontSize: 16,
-    textDecorationLine: 'underline',
-    marginLeft: 4,
+  sponsorLevelBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
+  sponsorLevelText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  sponsorTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  sponsorTypeText: {
+    fontSize: 10,
+    fontWeight: '500',
+    marginLeft: 3,
+  },
+
+  // ... rest of existing styles ...
 });
 
 export default EventDetailsScreen;

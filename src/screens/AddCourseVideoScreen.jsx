@@ -330,12 +330,21 @@ const AddCourseVideoScreen = ({route, navigation}) => {
               setThumbnail(null);
               setSequenceOrder(sequenceOrder + 1);
               setUploadProgress(0);
-              setUploadSuccessful(false); // Reset success state if adding another
+              setUploadSuccessful(false);
             },
           },
           {
             text: 'Done',
-            onPress: () => navigation.navigate('CourseDetails', {courseId}),
+            onPress: () => {
+              // Reset navigation stack to ensure clean navigation
+              navigation.reset({
+                index: 1,
+                routes: [
+                  { name: 'Courses' },
+                  { name: 'CourseDetails', params: { courseId } }
+                ],
+              });
+            },
             style: 'cancel',
           },
         ]);
@@ -374,10 +383,11 @@ const AddCourseVideoScreen = ({route, navigation}) => {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
-            // If upload was successful, navigate to course details
             if (uploadSuccessful) {
-              navigation.navigate('CourseDetails', {courseId});
+              // If upload was successful, go to course details
+              navigation.replace('CourseDetails', {courseId});
             } else {
+              // Otherwise, go back normally
               navigation.goBack();
             }
           }}>

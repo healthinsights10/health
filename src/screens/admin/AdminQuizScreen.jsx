@@ -120,25 +120,6 @@ const AdminQuizScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}>
-          <Icon name="arrow-left" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Manage Quiz</Text>
-        <TouchableOpacity
-          style={styles.saveButton}
-          onPress={saveQuiz}
-          disabled={saving}>
-          {saving ? (
-            <ActivityIndicator size="small" color="#2e7af5" />
-          ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-
       <ScrollView style={styles.scrollView}>
         <View style={styles.content}>
           <Text style={styles.eventTitle}>{eventTitle}</Text>

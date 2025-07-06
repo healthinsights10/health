@@ -278,6 +278,23 @@ const CreateConferenceScreen = ({navigation}) => {
     const combinedEndDate = new Date(endDate);
     combinedEndDate.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
 
+    // Combine manual sponsors and selected pharma sponsors
+    const pharmaSponsors = selectedPharmaIds.map(id => {
+      const pharma = pharmaCompanies.find(p => p.id === id);
+      return {
+        id: pharma.id,
+        name: pharma.company || pharma.name,
+        level: 'Standard',
+        contactPerson: pharma.name,
+        contactEmail: pharma.email || '',
+        pharma_id: pharma.id,
+        type: 'pharma_company',
+        approved: false,
+      };
+    });
+
+    const allSponsors = [...sponsors, ...pharmaSponsors];
+
     // Create event object
     const newEvent = {
       title,
@@ -297,7 +314,7 @@ const CreateConferenceScreen = ({navigation}) => {
       registrationFee: isFree ? '0' : regFee,
       tags: tags ? tags.split(',').map(tag => tag.trim()) : [],
       termsAndConditions,
-      sponsors,
+      sponsors: allSponsors, // <-- send all sponsors
       speakers,
     };
 

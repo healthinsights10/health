@@ -4,7 +4,7 @@ import {authService} from '../services/api';
 import {fcmService} from '../services/fcmService';
 
 // Add this line to define the API URL
-const API_URL = 'https://health-server-bw3x.onrender.com';
+const API_URL = 'http://192.168.1.4:5000';
 
 export const AuthContext = createContext();
 
