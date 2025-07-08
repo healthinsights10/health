@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Base URL for API calls
-const API_URL = 'https://health-server-bw3x.onrender.com/api';
+const API_URL = 'http://192.168.1.4:5000/api';
 
 // Create axios instance with better configuration
 const api = axios.create({
@@ -736,6 +736,38 @@ export const eventService = {
       throw error;
     }
   },
+
+  // Get event days
+  // getEventDays: async (eventId) => {
+  //   try {
+  //     const response = await fetch(`${API_BASE_URL}/events/${eventId}/days`, {
+  //       method: 'GET',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         Authorization: `Bearer ${await getToken()}`,
+  //       },
+  //     });
+
+  //     if (!response.ok) {
+  //       throw new Error('Failed to fetch event days');
+  //     }
+
+  //     return await response.json();
+  //   } catch (error) {
+  //     console.error('Get event days error:', error);
+  //     throw error;
+  //   }
+  // },
+  // Fix the getEventDays function - replace the existing one
+getEventDays: async (eventId) => {
+  try {
+    const response = await api.get(`/events/${eventId}/days`);
+    return response.data;
+  } catch (error) {
+    console.error('Get event days error:', error);
+    throw error;
+  }
+},
 };
 
 // User services

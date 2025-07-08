@@ -21,7 +21,7 @@ import {api} from '../services/api';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 // Use the same API URL as the auth service
-const API_BASE_URL = 'https://health-server-bw3x.onrender.com/api';
+const API_BASE_URL = 'http://192.168.1.4:5000/api';
 
 const SignUpScreen = ({navigation}) => {
   const [step, setStep] = useState(1);

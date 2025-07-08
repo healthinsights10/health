@@ -26,40 +26,46 @@ const CreateConferenceScreen = ({navigation}) => {
   const insets = useSafeAreaInsets();
   const {user} = useAuth();
   const isAdmin = user && user.role === 'admin';
+  
+  // Basic event details
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [venue, setVenue] = useState('');
   const [organizerName, setOrganizerName] = useState('');
   const [organizerEmail, setOrganizerEmail] = useState('');
   const [organizerPhone, setOrganizerPhone] = useState('');
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(
-    new Date(new Date().setDate(new Date().getDate() + 1)),
-  );
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-  const [conferenceType, setConferenceType] = useState('Conference'); // or Meeting
-  const [conferenceMode, setConferenceMode] = useState('In-Person'); // or Virtual
+  const [conferenceType, setConferenceType] = useState('Conference');
+  const [conferenceMode, setConferenceMode] = useState('In-Person');
   const [capacity, setCapacity] = useState('');
   const [website, setWebsite] = useState('');
   const [regFee, setRegFee] = useState('');
   const [isFree, setIsFree] = useState(false);
   const [tags, setTags] = useState('');
-  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
-  const [startTime, setStartTime] = useState(new Date());
-  const [endTime, setEndTime] = useState(
-    new Date(new Date().setHours(new Date().getHours() + 2)),
-  );
   const [termsAndConditions, setTermsAndConditions] = useState('');
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Sponsors state
+
+  // Multi-day event states
+  const [numberOfDays, setNumberOfDays] = useState(1);
+  const [eventDays, setEventDays] = useState([{
+    id: 1,
+    date: new Date(),
+    startTime: new Date(),
+    endTime: new Date(new Date().setHours(new Date().getHours() + 2)),
+    venue: '',
+    venueAddress: '',
+    description: '',
+    capacity: '',
+    specialNotes: '',
+    showDatePicker: false,
+    showStartTimePicker: false,
+    showEndTimePicker: false,
+  }]);
+
+  // Sponsors and speakers states
   const [sponsors, setSponsors] = useState([]);
   const [newSponsorName, setNewSponsorName] = useState('');
   const [newSponsorLevel, setNewSponsorLevel] = useState('');
-
-  // Speakers state
   const [speakers, setSpeakers] = useState([]);
   const [newSpeakerName, setNewSpeakerName] = useState('');
   const [newSpeakerTitle, setNewSpeakerTitle] = useState('');
@@ -69,11 +75,80 @@ const CreateConferenceScreen = ({navigation}) => {
   const [pharmaCompanies, setPharmaCompanies] = useState([]);
   const [selectedPharmaIds, setSelectedPharmaIds] = useState([]);
   const [loadingPharma, setLoadingPharma] = useState(false);
-
-  // Add these new state variables for search functionality
   const [sponsorSearchQuery, setSponsorSearchQuery] = useState('');
   const [filteredPharmaCompanies, setFilteredPharmaCompanies] = useState([]);
   const [showSponsorDropdown, setShowSponsorDropdown] = useState(false);
+
+  // Handle number of days change
+  const handleNumberOfDaysChange = (days) => {
+    const numDays = parseInt(days) || 1;
+    setNumberOfDays(numDays);
+    
+    const newEventDays = [];
+    for (let i = 0; i < numDays; i++) {
+      if (eventDays[i]) {
+        // Keep existing data if available
+        newEventDays.push(eventDays[i]);
+      } else {
+        // Create new day with default values
+        const baseDate = eventDays[0]?.date || new Date();
+        const dayDate = new Date(baseDate);
+        dayDate.setDate(baseDate.getDate() + i);
+        
+        newEventDays.push({
+          id: i + 1,
+          date: dayDate,
+          startTime: new Date(),
+          endTime: new Date(new Date().setHours(new Date().getHours() + 2)),
+          venue: '',
+          venueAddress: '',
+          description: '',
+          capacity: '',
+          specialNotes: '',
+          showDatePicker: false,
+          showStartTimePicker: false,
+          showEndTimePicker: false,
+        });
+      }
+    }
+    setEventDays(newEventDays);
+  };
+
+  // Update event day data
+  const updateEventDay = (dayIndex, field, value) => {
+    setEventDays(prevDays => {
+      const updatedDays = [...prevDays];
+      updatedDays[dayIndex] = {
+        ...updatedDays[dayIndex],
+        [field]: value,
+      };
+      return updatedDays;
+    });
+  };
+  
+  // Replace your existing handleDateChange function
+const handleDateChange = (dayIndex, event, selectedDate) => {
+  // Always close the picker first
+  updateEventDay(dayIndex, 'showDatePicker', false);
+  
+  // Only update the date if user pressed OK and selected a date
+  if (event.type === 'set' && selectedDate) {
+    updateEventDay(dayIndex, 'date', selectedDate);
+  }
+  // If user canceled (event.type === 'dismissed'), do nothing - just close the picker
+};
+
+// Replace your existing handleTimeChange function
+const handleTimeChange = (dayIndex, timeType, event, selectedTime) => {
+  // Always close the picker first
+  updateEventDay(dayIndex, `show${timeType}TimePicker`, false);
+  
+  // Only update the time if user pressed OK and selected a time
+  if (event.type === 'set' && selectedTime) {
+    updateEventDay(dayIndex, timeType === 'Start' ? 'startTime' : 'endTime', selectedTime);
+  }
+  // If user canceled (event.type === 'dismissed'), do nothing - just close the picker
+};
 
   const formatDate = date => {
     return `${date.getFullYear()}-${(date.getMonth() + 1)
@@ -85,39 +160,7 @@ const CreateConferenceScreen = ({navigation}) => {
     return `${date.getHours().toString().padStart(2, '0')}:${date
       .getMinutes()
       .toString()
-      .padStart(2, '0')}:00`;
-  };
-
-  const handleStartDateChange = (event, selectedDate) => {
-    setShowStartDatePicker(false);
-    if (selectedDate) {
-      setStartDate(selectedDate);
-      // If end date is before new start date, update end date
-      if (endDate < selectedDate) {
-        setEndDate(new Date(selectedDate.setDate(selectedDate.getDate() + 1)));
-      }
-    }
-  };
-
-  const handleEndDateChange = (event, selectedDate) => {
-    setShowEndDatePicker(false);
-    if (selectedDate) {
-      setEndDate(selectedDate);
-    }
-  };
-
-  const handleStartTimeChange = (event, selectedTime) => {
-    setShowStartTimePicker(false);
-    if (selectedTime) {
-      setStartTime(selectedTime);
-    }
-  };
-
-  const handleEndTimeChange = (event, selectedTime) => {
-    setShowEndTimePicker(false);
-    if (selectedTime) {
-      setEndTime(selectedTime);
-    }
+      .padStart(2, '0')}`;
   };
 
   const validateEmail = email => {
@@ -125,7 +168,7 @@ const CreateConferenceScreen = ({navigation}) => {
     return re.test(email);
   };
 
-  // Add a new sponsor
+  // Sponsors and speakers functions (keep existing ones)
   const addSponsor = () => {
     if (newSponsorName.trim() === '') {
       Alert.alert('Missing Information', 'Please enter sponsor name.');
@@ -143,12 +186,10 @@ const CreateConferenceScreen = ({navigation}) => {
     setNewSponsorLevel('');
   };
 
-  // Remove a sponsor
   const removeSponsor = sponsorId => {
     setSponsors(sponsors.filter(sponsor => sponsor.id !== sponsorId));
   };
 
-  // Add a new speaker
   const addSpeaker = () => {
     if (newSpeakerName.trim() === '') {
       Alert.alert('Missing Information', 'Please enter speaker name.');
@@ -168,12 +209,11 @@ const CreateConferenceScreen = ({navigation}) => {
     setNewSpeakerBio('');
   };
 
-  // Remove a speaker
   const removeSpeaker = speakerId => {
     setSpeakers(speakers.filter(speaker => speaker.id !== speakerId));
   };
 
-  // Fetch pharmaceutical companies
+  // Pharma companies functions (keep existing ones)
   useEffect(() => {
     fetchPharmaCompanies();
   }, []);
@@ -191,16 +231,6 @@ const CreateConferenceScreen = ({navigation}) => {
     }
   };
 
-  // Toggle pharmaceutical company selection
-  const togglePharmaSelection = pharmaId => {
-    if (selectedPharmaIds.includes(pharmaId)) {
-      setSelectedPharmaIds(selectedPharmaIds.filter(id => id !== pharmaId));
-    } else {
-      setSelectedPharmaIds([...selectedPharmaIds, pharmaId]);
-    }
-  };
-
-  // Update the pharma companies search functionality
   const handleSponsorSearch = query => {
     setSponsorSearchQuery(query);
     if (query.trim() === '') {
@@ -217,43 +247,45 @@ const CreateConferenceScreen = ({navigation}) => {
     }
   };
 
-  // Function to add a selected sponsor
   const addSelectedSponsor = pharma => {
-    // Check if already added
     if (selectedPharmaIds.includes(pharma.id)) {
       Alert.alert('Already Added', 'This sponsor has already been added.');
       return;
     }
 
-    // Add to selected sponsors
     setSelectedPharmaIds([...selectedPharmaIds, pharma.id]);
-
-    // Clear search
     setSponsorSearchQuery('');
     setFilteredPharmaCompanies([]);
     setShowSponsorDropdown(false);
   };
 
-  // Function to remove a selected sponsor
   const removeSelectedSponsor = pharmaId => {
     setSelectedPharmaIds(selectedPharmaIds.filter(id => id !== pharmaId));
   };
 
   const handleCreateConference = async () => {
-    // Validate form
-    if (!title) {
+    // Validate basic fields
+    if (!title || !description) {
       Alert.alert('Missing Information', 'Please fill all required fields.');
       return;
     }
 
-    if (isAdmin && !venue) {
-      if (!validateEmail(organizerEmail)) {
-        Alert.alert('Invalid Email', 'Please enter a valid email address.');
+    // Validate event days
+    for (let i = 0; i < eventDays.length; i++) {
+      const day = eventDays[i];
+      if (!day.date) {
+        Alert.alert('Missing Information', `Please set date for Day ${i + 1}.`);
         return;
       }
+      if (day.endTime <= day.startTime) {
+        Alert.alert('Invalid Time', `End time must be after start time for Day ${i + 1}.`);
+        return;
+      }
+    }
 
-      if (endDate < startDate) {
-        Alert.alert('Invalid Dates', 'End date must be after start date.');
+    if (isAdmin) {
+      if (organizerEmail && !validateEmail(organizerEmail)) {
+        Alert.alert('Invalid Email', 'Please enter a valid email address.');
         return;
       }
 
@@ -266,17 +298,18 @@ const CreateConferenceScreen = ({navigation}) => {
       }
     }
 
-    // Combine date and time for start and end dates
-    const combinedStartDate = new Date(startDate);
-    combinedStartDate.setHours(
-      startTime.getHours(),
-      startTime.getMinutes(),
-      0,
-      0,
-    );
-
-    const combinedEndDate = new Date(endDate);
-    combinedEndDate.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
+    // Prepare event days data
+    const eventDaysData = eventDays.map((day, index) => ({
+      dayNumber: index + 1,
+      date: formatDate(day.date),
+      startTime: formatTime(day.startTime),
+      endTime: formatTime(day.endTime),
+      venue: day.venue || '',
+      venueAddress: day.venueAddress || '',
+      description: day.description || '',
+      capacity: day.capacity ? parseInt(day.capacity) : null,
+      specialNotes: day.specialNotes || '',
+    }));
 
     // Combine manual sponsors and selected pharma sponsors
     const pharmaSponsors = selectedPharmaIds.map(id => {
@@ -299,14 +332,15 @@ const CreateConferenceScreen = ({navigation}) => {
     const newEvent = {
       title,
       description,
-      venue,
+      venue: venue || eventDays[0]?.venue || '',
       organizerName,
       organizerEmail,
       organizerPhone,
-      startDate: combinedStartDate.toISOString(),
-      endDate: combinedEndDate.toISOString(),
-      start_time: formatTime(startTime), // Must match backend field name
-      end_time: formatTime(endTime), // Must match backend field name
+      // Use first and last day for overall event dates
+      startDate: new Date(eventDays[0].date).toISOString(),
+      endDate: new Date(eventDays[eventDays.length - 1].date).toISOString(),
+      start_time: formatTime(eventDays[0].startTime),
+      end_time: formatTime(eventDays[eventDays.length - 1].endTime),
       type: conferenceType,
       mode: conferenceMode,
       capacity: capacity ? parseInt(capacity, 10) : null,
@@ -314,18 +348,18 @@ const CreateConferenceScreen = ({navigation}) => {
       registrationFee: isFree ? '0' : regFee,
       tags: tags ? tags.split(',').map(tag => tag.trim()) : [],
       termsAndConditions,
-      sponsors: allSponsors, // <-- send all sponsors
+      sponsors: allSponsors,
       speakers,
+      // Add event days data
+      eventDays: eventDaysData,
     };
 
-    console.log('Submitting event:', newEvent);
+    console.log('Submitting event with days:', newEvent);
 
-    // Submit event
     try {
       setIsSubmitting(true);
       const result = await eventService.createEvent(newEvent);
 
-      // If there are selected pharma companies, send sponsorship requests
       if (selectedPharmaIds.length > 0) {
         try {
           await eventService.sendSponsorshipRequests(
@@ -335,11 +369,9 @@ const CreateConferenceScreen = ({navigation}) => {
           console.log('Sponsorship requests sent successfully');
         } catch (sponsorError) {
           console.error('Error sending sponsorship requests:', sponsorError);
-          // Continue with event creation even if sponsorship requests fail
         }
       }
 
-      // Show success message
       Alert.alert(
         'Success',
         result.requiresApproval
@@ -358,7 +390,138 @@ const CreateConferenceScreen = ({navigation}) => {
     }
   };
 
-  // Render sponsor item for FlatList
+  // Render event day component
+  const renderEventDay = (day, index) => (
+    <View key={day.id} style={styles.eventDayContainer}>
+      <Text style={styles.dayTitle}>Day {index + 1}</Text>
+      
+      {/* Date Selection */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Date*</Text>
+        <TouchableOpacity
+          style={styles.dateInput}
+          onPress={() => updateEventDay(index, 'showDatePicker', true)}>
+          <Text>{formatDate(day.date)}</Text>
+          <Icon name="calendar" size={18} color="#666" />
+        </TouchableOpacity>
+        {day.showDatePicker && (
+          <DateTimePicker
+            value={day.date}
+            mode="date"
+            display="default"
+            onChange={(event, selectedDate) => handleDateChange(index, event, selectedDate)}
+            minimumDate={new Date()}
+          />
+        )}
+      </View>
+
+      {/* Time Selection */}
+      <View style={styles.timeContainer}>
+        <View style={styles.timeGroup}>
+          <Text style={styles.inputLabel}>Start Time*</Text>
+          <TouchableOpacity
+            style={styles.dateInput}
+            onPress={() => updateEventDay(index, 'showStartTimePicker', true)}>
+            <Text>{formatTime(day.startTime)}</Text>
+            <Icon name="clock-outline" size={18} color="#666" />
+          </TouchableOpacity>
+          {day.showStartTimePicker && (
+            <DateTimePicker
+              value={day.startTime}
+              mode="time"
+              display="default"
+              onChange={(event, selectedTime) => handleTimeChange(index, 'Start', event, selectedTime)}
+            />
+          )}
+        </View>
+
+        <View style={styles.timeGroup}>
+          <Text style={styles.inputLabel}>End Time*</Text>
+          <TouchableOpacity
+            style={styles.dateInput}
+            onPress={() => updateEventDay(index, 'showEndTimePicker', true)}>
+            <Text>{formatTime(day.endTime)}</Text>
+            <Icon name="clock-outline" size={18} color="#666" />
+          </TouchableOpacity>
+          {day.showEndTimePicker && (
+            <DateTimePicker
+              value={day.endTime}
+              mode="time"
+              display="default"
+              onChange={(event, selectedTime) => handleTimeChange(index, 'End', event, selectedTime)}
+            />
+          )}
+        </View>
+      </View>
+
+      {/* Venue for this day */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Venue (Day {index + 1})</Text>
+        <TextInput
+          style={styles.input}
+          placeholder={`Venue for day ${index + 1}`}
+          placeholderTextColor="#999"
+          value={day.venue}
+          onChangeText={(text) => updateEventDay(index, 'venue', text)}
+        />
+      </View>
+
+      {/* Venue Address */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Venue Address</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Full address of the venue"
+          placeholderTextColor="#999"
+          value={day.venueAddress}
+          onChangeText={(text) => updateEventDay(index, 'venueAddress', text)}
+        />
+      </View>
+
+      {/* Day Description */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Day Description</Text>
+        <TextInput
+          style={[styles.input, styles.textarea]}
+          placeholder={`What happens on day ${index + 1}?`}
+          placeholderTextColor="#999"
+          value={day.description}
+          onChangeText={(text) => updateEventDay(index, 'description', text)}
+          multiline={true}
+          numberOfLines={3}
+        />
+      </View>
+
+      {/* Capacity for this day */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Capacity (Day {index + 1})</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Maximum attendees for this day"
+          placeholderTextColor="#999"
+          value={day.capacity}
+          onChangeText={(text) => updateEventDay(index, 'capacity', text)}
+          keyboardType="number-pad"
+        />
+      </View>
+
+      {/* Special Notes */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Special Notes</Text>
+        <TextInput
+          style={[styles.input, styles.textarea]}
+          placeholder="Any special notes or instructions for this day"
+          placeholderTextColor="#999"
+          value={day.specialNotes}
+          onChangeText={(text) => updateEventDay(index, 'specialNotes', text)}
+          multiline={true}
+          numberOfLines={3}
+        />
+      </View>
+    </View>
+  );
+
+  // Render functions for sponsors and speakers (keep existing ones)
   const renderSponsorItem = ({item}) => (
     <View style={styles.listItem}>
       <View style={styles.listItemContent}>
@@ -371,7 +534,6 @@ const CreateConferenceScreen = ({navigation}) => {
     </View>
   );
 
-  // Render speaker item for FlatList
   const renderSpeakerItem = ({item}) => (
     <View style={styles.listItem}>
       <View style={styles.listItemContent}>
@@ -511,102 +673,49 @@ const CreateConferenceScreen = ({navigation}) => {
             </View>
           )}
 
-          {/* Date and Time */}
-          <Text style={styles.sectionTitle}>Date and Time</Text>
-          <View style={styles.dateContainer}>
-            <View style={styles.dateGroup}>
-              <Text style={styles.inputLabel}>Start Date*</Text>
-              <TouchableOpacity
-                style={styles.dateInput}
-                onPress={() => setShowStartDatePicker(true)}>
-                <Text>{formatDate(startDate)}</Text>
-                <Icon name="calendar" size={18} color="#666" />
-              </TouchableOpacity>
-              {showStartDatePicker && (
-                <DateTimePicker
-                  value={startDate}
-                  mode="date"
-                  display="default"
-                  onChange={handleStartDateChange}
-                  minimumDate={new Date()}
-                />
-              )}
-            </View>
-
-            <View style={styles.dateGroup}>
-              <Text style={styles.inputLabel}>End Date*</Text>
-              <TouchableOpacity
-                style={styles.dateInput}
-                onPress={() => setShowEndDatePicker(true)}>
-                <Text>{formatDate(endDate)}</Text>
-                <Icon name="calendar" size={18} color="#666" />
-              </TouchableOpacity>
-              {showEndDatePicker && (
-                <DateTimePicker
-                  value={endDate}
-                  mode="date"
-                  display="default"
-                  onChange={handleEndDateChange}
-                  minimumDate={startDate}
-                />
-              )}
+          {/* Number of Days Selection */}
+          <Text style={styles.sectionTitle}>Event Duration</Text>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Number of Days*</Text>
+            <View style={styles.daysContainer}>
+              {[1, 2, 3, 4, 5, 6, 7].map((days) => (
+                <TouchableOpacity
+                  key={days}
+                  style={[
+                    styles.dayButton,
+                    numberOfDays === days && styles.dayButtonSelected,
+                  ]}
+                  onPress={() => handleNumberOfDaysChange(days)}>
+                  <Text
+                    style={[
+                      styles.dayButtonText,
+                      numberOfDays === days && styles.dayButtonTextSelected,
+                    ]}>
+                    {days}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
 
-          <View style={styles.dateContainer}>
-            <View style={styles.dateGroup}>
-              <Text style={styles.inputLabel}>Start Time</Text>
-              <TouchableOpacity
-                style={styles.dateInput}
-                onPress={() => setShowStartTimePicker(true)}>
-                <Text>{formatTime(startTime)}</Text>
-                <Icon name="clock-outline" size={18} color="#666" />
-              </TouchableOpacity>
-              {showStartTimePicker && (
-                <DateTimePicker
-                  value={startTime}
-                  mode="time"
-                  display="default"
-                  onChange={handleStartTimeChange}
-                />
-              )}
-            </View>
+          {/* Event Days Section */}
+          <Text style={styles.sectionTitle}>Event Schedule</Text>
+          {eventDays.map((day, index) => renderEventDay(day, index))}
 
-            <View style={styles.dateGroup}>
-              <Text style={styles.inputLabel}>End Time</Text>
-              <TouchableOpacity
-                style={styles.dateInput}
-                onPress={() => setShowEndTimePicker(true)}>
-                <Text>{formatTime(endTime)}</Text>
-                <Icon name="clock-outline" size={18} color="#666" />
-              </TouchableOpacity>
-              {showEndTimePicker && (
-                <DateTimePicker
-                  value={endTime}
-                  mode="time"
-                  display="default"
-                  onChange={handleEndTimeChange}
-                />
-              )}
-            </View>
-          </View>
-
-          {/* Location */}
+          {/* General Venue (if admin) */}
           {isAdmin && (
             <>
-              <Text style={styles.sectionTitle}>Location</Text>
+              <Text style={styles.sectionTitle}>General Event Information</Text>
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>
-                  {conferenceMode === 'Virtual'
-                    ? 'Platform/Link*'
-                    : 'Venue/Address*'}
+                  Main Venue/Platform
                 </Text>
                 <TextInput
                   style={styles.input}
                   placeholder={
                     conferenceMode === 'Virtual'
                       ? 'e.g., Zoom, Google Meet, or platform link'
-                      : 'Enter the full address of the venue'
+                      : 'Enter the main venue or address'
                   }
                   placeholderTextColor={'#999'}
                   value={venue}
@@ -614,19 +723,17 @@ const CreateConferenceScreen = ({navigation}) => {
                 />
               </View>
 
-              {conferenceMode === 'In-Person' && (
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Capacity</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Maximum number of attendees"
-                    placeholderTextColor={'#999'}
-                    value={capacity}
-                    onChangeText={setCapacity}
-                    keyboardType="number-pad"
-                  />
-                </View>
-              )}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Overall Capacity</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Maximum number of attendees overall"
+                  placeholderTextColor={'#999'}
+                  value={capacity}
+                  onChangeText={setCapacity}
+                  keyboardType="number-pad"
+                />
+              </View>
             </>
           )}
 
@@ -693,7 +800,7 @@ const CreateConferenceScreen = ({navigation}) => {
           <Text style={styles.sectionTitle}>Sponsors</Text>
 
           {/* Sponsor Search */}
-          <View style={[styles.inputGroup, ]}>
+          <View style={[styles.inputGroup]}>
             {/* Search Input */}
             <View style={styles.searchContainer}>
               <View style={styles.searchInputContainer}>
@@ -798,7 +905,7 @@ const CreateConferenceScreen = ({navigation}) => {
             </View>
           )}
 
-          {/* Current Manual Sponsors List (keep existing manual sponsor functionality) */}
+          {/* Current Manual Sponsors List */}
           {sponsors.length > 0 && (
             <View style={styles.listContainer}>
               <Text style={styles.sponsorListTitle}>
@@ -947,7 +1054,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f7f9fc',
-    //paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     padding: 16,
@@ -1037,12 +1143,76 @@ const styles = StyleSheet.create({
     height: 150,
     textAlignVertical: 'top',
   },
-  dateContainer: {
+  adminOnlyLabel: {
+    fontSize: 12,
+    color: '#2e7af5',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  adminOnlyText: {
+    fontSize: 14,
+    color: '#2e7af5',
+    fontStyle: 'italic',
+  },
+  // New styles for multi-day functionality
+  daysContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  dayButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#ddd',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    marginBottom: 8,
+    backgroundColor: 'white',
+  },
+  dayButtonSelected: {
+    borderColor: '#2e7af5',
+    backgroundColor: '#2e7af5',
+  },
+  dayButtonText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+  dayButtonTextSelected: {
+    color: 'white',
+  },
+  eventDayContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  dayTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2e7af5',
+    marginBottom: 16,
+    textAlign: 'center',
+    backgroundColor: '#f0f6ff',
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  timeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 16,
   },
-  dateGroup: {
+  timeGroup: {
     width: '48%',
   },
   dateInput: {
@@ -1144,53 +1314,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  pharmaList: {
-    marginTop: 10,
-  },
-  pharmaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  pharmaName: {
-    fontSize: 16,
-    color: '#333',
-    marginLeft: 12,
-  },
-  noPharmaText: {
-    fontSize: 14,
-    color: '#666',
-    fontStyle: 'italic',
-    marginTop: 10,
-  },
-  inputDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
   sponsorListTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 10,
-  },
-  selectedPharmaContainer: {
-    marginTop: 16,
-    backgroundColor: '#f9f9f9',
-    padding: 12,
-    borderRadius: 8,
-  },
-  selectedPharmaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  selectedPharmaName: {
-    fontSize: 14,
-    color: '#333',
-    marginLeft: 8,
   },
   searchContainer: {
     width: '100%',

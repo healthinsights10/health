@@ -54,28 +54,98 @@ const ConferencesScreen = ({navigation}) => {
     });
   };
 
-  // Update the fetchEvents function to include brochure data
+  // Add this new component for rendering multi-day date information
+  const renderEventDates = (event, eventDays = []) => {
+    if (eventDays && eventDays.length > 1) {
+      // Multi-day event
+      return (
+        <View style={styles.multiDayContainer}>
+          <View style={styles.eventDetailItem}>
+            <Icon name="calendar-range" size={16} color="#666" />
+            <Text style={styles.eventDetailText}>
+              {eventDays.length} Days: {formatDate(eventDays[0].date)} -{' '}
+              {formatDate(eventDays[eventDays.length - 1].date)}
+            </Text>
+          </View>
+
+          {/* Show first 2 days with times */}
+          {eventDays.slice(0, 2).map((day, index) => (
+            <View key={day.day_number} style={styles.dayTimeItem}>
+              <Icon name="clock" size={14} color="#888" />
+              <Text style={styles.dayTimeText}>
+                Day {day.day_number}: {formatTime(day.start_time)} -{' '}
+                {formatTime(day.end_time)}
+              </Text>
+            </View>
+          ))}
+
+          {eventDays.length > 2 && (
+            <Text style={styles.moreDaysText}>
+              +{eventDays.length - 2} more days
+            </Text>
+          )}
+        </View>
+      );
+    } else {
+      // Single day event
+      return (
+        <>
+          <View style={styles.eventDetailItem}>
+            <Icon name="calendar" size={16} color="#666" />
+            <Text style={styles.eventDetailText}>
+              {formatDate(event.start_date)} - {formatDate(event.end_date)}
+            </Text>
+          </View>
+
+          <View style={styles.eventDetailItem}>
+            <Icon name="clock" size={16} color="#666" />
+            <Text style={styles.eventDetailText}>
+              {formatTime(event.start_time)} - {formatTime(event.end_time)}
+            </Text>
+          </View>
+        </>
+      );
+    }
+  };
+
+  // Update the fetchEvents function to include event days
   const fetchEvents = async () => {
     try {
       setLoading(true);
       const data = await eventService.getAllEvents();
 
-      // Fetch brochure info for each event
-      const eventsWithBrochures = await Promise.all(
+      // Fetch brochure info and event days for each event
+      const eventsWithAdditionalData = await Promise.all(
         data.map(async event => {
           try {
+            // Fetch brochure
             const brochureData = await eventService.getEventBrochure(event.id);
-            return {...event, brochure: brochureData};
+
+            // Fetch event days
+            let eventDays = [];
+            try {
+              eventDays = await eventService.getEventDays(event.id);
+            } catch (error) {
+              console.log('No event days found for event:', event.id);
+            }
+
+            return {
+              ...event,
+              brochure: brochureData,
+              eventDays: eventDays || [],
+            };
           } catch (error) {
-            // If no brochure or error, return event without brochure
-            return event;
+            return {
+              ...event,
+              eventDays: [],
+            };
           }
         }),
       );
 
-      // Sort events by created_at in descending order (newest first)
-      const sortedEvents = eventsWithBrochures.sort((a, b) => {
-        return new Date(a.start_date) - new Date(b.start_date); // Soonest first
+      // Sort events by start date
+      const sortedEvents = eventsWithAdditionalData.sort((a, b) => {
+        return new Date(a.start_date) - new Date(b.start_date);
       });
 
       setEvents(sortedEvents);
@@ -205,19 +275,8 @@ const ConferencesScreen = ({navigation}) => {
       <Text style={styles.eventDescription}>{event.description}</Text>
 
       <View style={styles.eventDetails}>
-        <View style={styles.eventDetailItem}>
-          <Icon name="calendar" size={16} color="#666" />
-          <Text style={styles.eventDetailText}>
-            {formatDate(event.start_date)} - {formatDate(event.end_date)}
-          </Text>
-        </View>
-
-        <View style={styles.eventDetailItem}>
-          <Icon name="clock" size={16} color="#666" />
-          <Text style={styles.eventDetailText}>
-            {formatTime(event.start_time)} - {formatTime(event.end_time)}
-          </Text>
-        </View>
+        {/* Use the new multi-day date renderer */}
+        {renderEventDates(event, event.eventDays)}
 
         <View style={styles.eventDetailItem}>
           <Icon
@@ -711,6 +770,29 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     maxWidth: '80%',
+  },
+
+  // Add these new styles for multi-day events
+  multiDayContainer: {
+    marginBottom: 8,
+  },
+  dayTimeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    marginLeft: 20,
+  },
+  dayTimeText: {
+    fontSize: 12,
+    color: '#888',
+    marginLeft: 6,
+  },
+  moreDaysText: {
+    fontSize: 12,
+    color: '#2e7af5',
+    fontStyle: 'italic',
+    marginLeft: 20,
+    marginTop: 4,
   },
 });
 

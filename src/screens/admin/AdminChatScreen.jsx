@@ -26,8 +26,8 @@ import {Linking} from 'react-native';
 import RNFS from 'react-native-fs';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-const SOCKET_URL = 'https://health-server-bw3x.onrender.com';
-const API_URL = 'https://health-server-bw3x.onrender.com';
+const SOCKET_URL = 'http://192.168.1.4:5000';
+const API_URL = 'http://192.168.1.4:5000';
 
 const AdminChatScreen = ({navigation}) => {
   const {user} = useAuth();

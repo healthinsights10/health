@@ -59,15 +59,18 @@ const EventDetailsScreen = ({route, navigation}) => {
   const {eventId} = route.params;
   const {user} = useAuth();
   const [event, setEvent] = useState(null);
+  const [eventDays, setEventDays] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [registeredEvents, setRegisteredEvents] = useState([]); // Add this
+  const [registeredEvents, setRegisteredEvents] = useState([]);
   const [brochure, setBrochure] = useState(null);
-  const [brochureLoading, setBrochureLoading] = useState(false); // Add this
+  const [brochureLoading, setBrochureLoading] = useState(false);
   const insets = useSafeAreaInsets();
+
   useEffect(() => {
     fetchEventDetails();
-    fetchEventBrochure(); // Ensure this is called
+    fetchEventBrochure();
     fetchRegisteredEvents();
+    fetchEventDays(); // Add this
   }, [eventId]);
 
   const fetchEventDetails = async () => {
@@ -126,6 +129,17 @@ const EventDetailsScreen = ({route, navigation}) => {
       // Not showing an alert as this is not critical
     } finally {
       setBrochureLoading(false);
+    }
+  };
+
+  // Add this new function
+  const fetchEventDays = async () => {
+    try {
+      const eventDaysData = await eventService.getEventDays(eventId);
+      setEventDays(eventDaysData || []);
+    } catch (error) {
+      console.error('Failed to load event days:', error);
+      setEventDays([]);
     }
   };
 
@@ -345,6 +359,119 @@ const EventDetailsScreen = ({route, navigation}) => {
     }
   };
 
+  // Add this helper function to format time from time string
+  const formatTimeFromString = (timeString) => {
+    if (!timeString) return '';
+    try {
+      // timeString is in format "HH:MM:SS" or "HH:MM"
+      const [hours, minutes] = timeString.split(':');
+      const date = new Date();
+      date.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+      return date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+    } catch (error) {
+      return timeString; // Return original if parsing fails
+    }
+  };
+
+  // Add this component to render event days
+  const renderEventDays = () => {
+    if (!eventDays || eventDays.length === 0) {
+      // Fallback to original single-day display
+      return (
+        <>
+          <View style={styles.detailRow}>
+            <Icon name="calendar-range" size={20} color="#2e7af5" />
+            <View style={styles.detailTextContainer}>
+              <Text style={styles.detailLabel}>Start Date</Text>
+              <Text style={styles.detailText}>
+                {formatDate(event.startDate)} at {formatTime(event.startDate)}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.detailRow}>
+            <Icon name="calendar-range" size={20} color="#2e7af5" />
+            <View style={styles.detailTextContainer}>
+              <Text style={styles.detailLabel}>End Date</Text>
+              <Text style={styles.detailText}>
+                {formatDate(event.endDate)} at {formatTime(event.endDate)}
+              </Text>
+            </View>
+          </View>
+        </>
+      );
+    }
+
+    // Multi-day event display
+    return (
+      <View style={styles.multiDayEventsContainer}>
+        <View style={styles.eventOverviewRow}>
+          <Icon name="calendar-multiple" size={20} color="#2e7af5" />
+          <View style={styles.detailTextContainer}>
+            <Text style={styles.detailLabel}>Event Duration</Text>
+            <Text style={styles.detailText}>
+              {eventDays.length} Day{eventDays.length > 1 ? 's' : ''} • {formatDate(eventDays[0].date)} - {formatDate(eventDays[eventDays.length - 1].date)}
+            </Text>
+          </View>
+        </View>
+
+        {eventDays.map((day, index) => (
+          <View key={day.day_number} style={styles.eventDayCard}>
+            <View style={styles.dayHeader}>
+              <View style={styles.dayNumberBadge}>
+                <Text style={styles.dayNumberText}>{day.day_number}</Text>
+              </View>
+              <View style={styles.dayHeaderInfo}>
+                <Text style={styles.dayDate}>{formatDate(day.date)}</Text>
+                <Text style={styles.dayTime}>
+                  {formatTimeFromString(day.start_time)} - {formatTimeFromString(day.end_time)}
+                </Text>
+              </View>
+            </View>
+
+            {day.venue && (
+              <View style={styles.dayDetail}>
+                <Icon name="map-marker" size={16} color="#666" />
+                <Text style={styles.dayDetailText}>{day.venue}</Text>
+              </View>
+            )}
+
+            {day.venue_address && (
+              <View style={styles.dayDetail}>
+                <Icon name="map-marker-outline" size={16} color="#666" />
+                <Text style={styles.dayDetailText}>{day.venue_address}</Text>
+              </View>
+            )}
+
+            {day.description && (
+              <View style={styles.dayDetail}>
+                <Icon name="text" size={16} color="#666" />
+                <Text style={styles.dayDetailText}>{day.description}</Text>
+              </View>
+            )}
+
+            {day.capacity && (
+              <View style={styles.dayDetail}>
+                <Icon name="account-group" size={16} color="#666" />
+                <Text style={styles.dayDetailText}>{day.capacity} attendees</Text>
+              </View>
+            )}
+
+            {day.special_notes && (
+              <View style={styles.dayDetail}>
+                <Icon name="note-text" size={16} color="#666" />
+                <Text style={styles.dayDetailText}>{day.special_notes}</Text>
+              </View>
+            )}
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -437,7 +564,7 @@ const EventDetailsScreen = ({route, navigation}) => {
               </TouchableOpacity>
             </>
           ) : (
-            // Show Register/Registered and Calendar buttons for other users
+            // Show Register/Registered and Quiz buttons for other users
             <>
               {event.status === 'approved' &&
                 (registeredEvents.includes(event.id) ? (
@@ -462,7 +589,6 @@ const EventDetailsScreen = ({route, navigation}) => {
                   </TouchableOpacity>
                 ))}
 
-              {/* Add this button in the action buttons section */}
               <TouchableOpacity
                 style={[styles.secondaryButton, {backgroundColor: '#ff85be'}]}
                 onPress={() =>
@@ -480,30 +606,15 @@ const EventDetailsScreen = ({route, navigation}) => {
           )}
         </View>
 
-        {/* Date and Time Section */}
+        {/* Date and Time Section - Updated */}
         <View style={styles.detailSection}>
-          <Text style={styles.sectionTitle}>Date & Time</Text>
-          <View style={styles.detailRow}>
-            <Icon name="calendar-range" size={20} color="#2e7af5" />
-            <View style={styles.detailTextContainer}>
-              <Text style={styles.detailLabel}>Start Date</Text>
-              <Text style={styles.detailText}>
-                {formatDate(event.startDate)} at {formatTime(event.startDate)}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.detailRow}>
-            <Icon name="calendar-range" size={20} color="#2e7af5" />
-            <View style={styles.detailTextContainer}>
-              <Text style={styles.detailLabel}>End Date</Text>
-              <Text style={styles.detailText}>
-                {formatDate(event.endDate)} at {formatTime(event.endDate)}
-              </Text>
-            </View>
-          </View>
+          <Text style={styles.sectionTitle}>
+            {eventDays && eventDays.length > 1 ? 'Event Schedule' : 'Date & Time'}
+          </Text>
+          {renderEventDays()}
         </View>
 
-        {/* Venue Section */}
+        {/* Location Section - Updated for multi-day */}
         <View style={styles.detailSection}>
           <Text style={styles.sectionTitle}>Location</Text>
           <View style={styles.detailRow}>
@@ -514,7 +625,7 @@ const EventDetailsScreen = ({route, navigation}) => {
             />
             <View style={styles.detailTextContainer}>
               <Text style={styles.detailLabel}>
-                {event.mode === 'Virtual' ? 'Platform' : 'Venue'}
+                {event.mode === 'Virtual' ? 'Platform' : 'Main Venue'}
               </Text>
 
               {/* Virtual event handling */}
@@ -546,7 +657,7 @@ const EventDetailsScreen = ({route, navigation}) => {
             <View style={styles.detailRow}>
               <Icon name="account-group" size={20} color="#2e7af5" />
               <View style={styles.detailTextContainer}>
-                <Text style={styles.detailLabel}>Capacity</Text>
+                <Text style={styles.detailLabel}>Overall Capacity</Text>
                 <Text style={styles.detailText}>
                   {event.capacity} attendees
                 </Text>
@@ -603,7 +714,7 @@ const EventDetailsScreen = ({route, navigation}) => {
           </View>
         )}
 
-        {/* Sponsors Section - Clean UI */}
+        {/* Sponsors Section */}
         {event.sponsors && event.sponsors.length > 0 && (
           <View style={styles.detailSection}>
             <Text style={styles.sectionTitle}>
@@ -629,20 +740,6 @@ const EventDetailsScreen = ({route, navigation}) => {
             />
           </View>
         )}
-
-        {/* Tags Section */}
-        {/* {event.tags && event.tags.length > 0 && (
-          <View style={styles.detailSection}>
-            <Text style={styles.sectionTitle}>Tags</Text>
-            <View style={styles.tagsContainer}>
-              {event.tags.map((tag, index) => (
-                <View key={index} style={styles.tag}>
-                  <Text style={styles.tagText}>{tag}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )} */}
 
         {/* Organizer Information */}
         <View style={styles.detailSection}>
@@ -692,20 +789,11 @@ const EventDetailsScreen = ({route, navigation}) => {
           </View>
         )}
       </ScrollView>
-
-      {/* {event.status === 'approved' && (
-        <View style={styles.bottomButtonContainer}>
-          <TouchableOpacity
-            style={styles.bottomButton}
-            onPress={() => navigation.navigate('EditEvent', {eventId})}>
-            <Text style={styles.bottomButtonText}>Register for this Event</Text>
-          </TouchableOpacity>
-        </View>
-      )} */}
     </SafeAreaView>
   );
 };
 
+// Add these new styles to the existing StyleSheet
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1010,6 +1098,85 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
     marginLeft: 3,
+  },
+
+  // New styles for multi-day events
+  multiDayEventsContainer: {
+    gap: 12,
+  },
+  eventOverviewRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  eventDayCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2e7af5',
+  },
+  dayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  dayNumberBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#2e7af5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  dayNumberText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  dayHeaderInfo: {
+    flex: 1,
+  },
+  dayDate: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  dayTime: {
+    fontSize: 14,
+    color: '#666',
+  },
+  dayDetail: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  dayDetailText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 20,
+  },
+  joinLinkContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 8,
+  },
+  joinLinkText: {
+    fontSize: 14,
+    color: '#2e7af5',
+    fontWeight: '500',
+    marginLeft: 6,
   },
 
   // ... rest of existing styles ...
