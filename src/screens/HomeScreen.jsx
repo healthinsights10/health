@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback, useMemo} from 'react';
 import {
   View,
   Text,
@@ -20,60 +20,78 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import {useAuth} from '../context/AuthContext';
 import {eventService} from '../services/api';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {Calendar} from 'react-native-calendars'; // Add this import
+import {Calendar} from 'react-native-calendars';
 import api from '../services/api';
 
-// Event Status Badge Component (reused from MyEventsScreen)
-const EventStatusBadge = ({status}) => {
-  let bgColor = '#FFF3E0'; // Default pending color
-  let textColor = '#E65100';
-  let iconName = 'clock-outline';
-  let label = 'Pending';
+// Performance constants
+const INITIAL_RENDER_COUNT = 3;
+const LOAD_MORE_COUNT = 5;
 
-  if (status === 'approved') {
-    bgColor = '#E8F5E9';
-    textColor = '#2E7D32';
-    iconName = 'check-circle';
-    label = 'Approved';
-  } else if (status === 'rejected') {
-    bgColor = '#FFEBEE';
-    textColor = '#C62828';
-    iconName = 'close-circle';
-    label = 'Rejected';
-  }
+// Event Status Badge Component (memoized for performance)
+const EventStatusBadge = React.memo(({status}) => {
+  const badgeConfig = useMemo(() => {
+    switch (status) {
+      case 'approved':
+        return {
+          bgColor: '#E8F5E9',
+          textColor: '#2E7D32',
+          iconName: 'check-circle',
+          label: 'Approved',
+        };
+      case 'rejected':
+        return {
+          bgColor: '#FFEBEE',
+          textColor: '#C62828',
+          iconName: 'close-circle',
+          label: 'Rejected',
+        };
+      default:
+        return {
+          bgColor: '#FFF3E0',
+          textColor: '#E65100',
+          iconName: 'clock-outline',
+          label: 'Pending',
+        };
+    }
+  }, [status]);
 
   return (
-    <View style={[styles.badge, {backgroundColor: bgColor}]}>
+    <View style={[styles.badge, {backgroundColor: badgeConfig.bgColor}]}>
       <Icon
-        name={iconName}
+        name={badgeConfig.iconName}
         size={12}
-        color={textColor}
+        color={badgeConfig.textColor}
         style={{marginRight: 4}}
       />
-      <Text style={[styles.badgeText, {color: textColor}]}>{label}</Text>
+      <Text style={[styles.badgeText, {color: badgeConfig.textColor}]}>
+        {badgeConfig.label}
+      </Text>
     </View>
   );
-};
+});
 
 const HomeScreen = ({navigation}) => {
-  // Get user from auth context
   const {user} = useAuth();
   const insets = useSafeAreaInsets();
-  // State for events
-  const [registeredEvents, setRegisteredEvents] = useState([]); // Add this at the top with other states
+
+  // Performance optimization states
+  const [initialRenderComplete, setInitialRenderComplete] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // Core states
+  const [registeredEvents, setRegisteredEvents] = useState([]);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState('my'); // 'my', 'ongoing', 'recommended'
+  const [activeTab, setActiveTab] = useState('my');
 
-  // Add state for all events categories for unified calendar
+  // Optimized states
   const [allEventsData, setAllEventsData] = useState({
     myEvents: [],
     ongoingEvents: [],
     registeredEvents: [],
   });
 
-  // Add state for stats
   const [stats, setStats] = useState({
     upcomingEvents: 0,
     newRegistrations: 0,
@@ -81,92 +99,53 @@ const HomeScreen = ({navigation}) => {
     nextMeetingDays: null,
   });
 
-  // Add new state for search
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredEvents, setFilteredEvents] = useState([]);
-  // Add these near your other state declarations
   const [showCalendar, setShowCalendar] = useState(false);
   const [markedDates, setMarkedDates] = useState({});
-
-  // Add this state variable with your other state declarations
   const [profileImage, setProfileImage] = useState(user?.avatar_url || null);
 
-  useEffect(() => {
-    calculateStats(allEventsData);
-  }, [allEventsData]);
-
-  // Helper function to get proper greeting based on time of day
-  const getGreeting = () => {
+  // Memoized greeting and name to avoid recalculation
+  const greeting = useMemo(() => {
     const hours = new Date().getHours();
     if (hours < 12) return 'Good Morning';
     if (hours < 18) return 'Good Afternoon';
     return 'Good Evening';
-  };
+  }, []);
 
-  // Format the name with title if user is a doctor
-  const getFormattedName = () => {
+  const formattedName = useMemo(() => {
     if (!user) return 'User';
+    const firstName = user.name.split(' ')[0];
+    return user.role === 'doctor' ? `Dr. ${firstName}` : firstName;
+  }, [user]);
 
-    if (user.role === 'doctor') {
-      // Get first name only for a more personal greeting
-      const firstName = user.name.split(' ')[0];
-      return `Dr. ${firstName}`;
+  // Optimized events to display
+  const eventsToDisplay = useMemo(() => {
+    const dataToShow = filteredEvents.length > 0 ? filteredEvents : events;
+    if (!initialRenderComplete) {
+      return dataToShow.slice(0, INITIAL_RENDER_COUNT);
     }
+    return dataToShow;
+  }, [filteredEvents, events, initialRenderComplete]);
 
-    // For non-doctors just use their first name
-    return user.name.split(' ')[0];
-  };
-
-  // Add function to fetch registered events
-  const fetchRegisteredEvents = async () => {
-    try {
-      const data = await eventService.getRegisteredEvents();
-      setRegisteredEvents(data.map(event => event.id));
-    } catch (error) {
-      console.error('Failed to fetch registered events:', error);
-    }
-  };
-
-  // Add this function to fetch profile image
-  const fetchProfileImage = async () => {
-    try {
-      const response = await api.get(`/users/profile-image`);
-      if (response.data && response.data.avatar_url) {
-        setProfileImage(response.data.avatar_url);
-      }
-    } catch (error) {
-      console.log('Could not fetch profile image:', error);
-      // Keep using existing image or default
-    }
-  };
-
-  // Calculate real stats from events data
-  const calculateStats = allEventsData => {
+  // Memoized stats calculation
+  const calculateStats = useCallback((allEventsData) => {
     const now = new Date();
-
-    // Combine all events from all categories
     const allEvents = [
       ...allEventsData.myEvents,
       ...allEventsData.ongoingEvents,
       ...allEventsData.registeredEvents,
     ];
 
-    // Remove duplicates by event id
-    const uniqueEvents = [];
-    const seenIds = new Set();
-    for (const ev of allEvents) {
-      if (!seenIds.has(ev.id)) {
-        uniqueEvents.push(ev);
-        seenIds.add(ev.id);
-      }
-    }
+    // Remove duplicates efficiently
+    const uniqueEvents = allEvents.filter((event, index, self) => 
+      index === self.findIndex(e => e.id === event.id)
+    );
 
-    // Count upcoming events (events that haven't ended yet)
     const upcoming = uniqueEvents.filter(
       event => new Date(event.endDate) >= now,
     );
 
-    // Count this week's meetings/events
     const oneWeekFromNow = new Date(now);
     oneWeekFromNow.setDate(now.getDate() + 7);
 
@@ -174,7 +153,6 @@ const HomeScreen = ({navigation}) => {
       event => new Date(event.startDate) <= oneWeekFromNow,
     );
 
-    // Find next meeting
     const nextMeeting = upcoming.sort(
       (a, b) => new Date(a.startDate) - new Date(b.startDate),
     )[0];
@@ -182,11 +160,9 @@ const HomeScreen = ({navigation}) => {
     let nextMeetingDays = null;
     if (nextMeeting) {
       const diffTime = Math.abs(new Date(nextMeeting.startDate) - now);
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      nextMeetingDays = diffDays;
+      nextMeetingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }
 
-    // Get new registrations this week (dummy logic - replace with actual if available)
     const newRegistrations = Math.min(upcoming.length, 2);
 
     setStats({
@@ -195,10 +171,102 @@ const HomeScreen = ({navigation}) => {
       meetingsThisWeek: thisWeekMeetings.length,
       nextMeetingDays,
     });
-  };
+  }, []);
 
-  // Add new function to fetch all events data for unified calendar
-  const fetchAllEventsData = async () => {
+  // Optimized fetch functions with priority loading
+  const fetchRegisteredEvents = useCallback(async () => {
+    try {
+      const data = await eventService.getRegisteredEvents();
+      setRegisteredEvents(data.map(event => event.id));
+    } catch (error) {
+      console.error('Failed to fetch registered events:', error);
+    }
+  }, []);
+
+  const fetchProfileImage = useCallback(async () => {
+    try {
+      const response = await api.get(`/users/profile-image`);
+      if (response.data?.avatar_url) {
+        setProfileImage(response.data.avatar_url);
+      }
+    } catch (error) {
+      console.log('Could not fetch profile image:', error);
+    }
+  }, []);
+
+  // Fast initial fetch with minimal data
+  const fetchEventsQuick = useCallback(async () => {
+    try {
+      setLoading(true);
+      let data;
+
+      switch (activeTab) {
+        case 'my':
+          data = await eventService.getMyEvents();
+          break;
+        case 'ongoing':
+          data = await eventService.getOngoingEvents();
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          data = data.filter(event => {
+            const startDate = new Date(event.startDate);
+            startDate.setHours(0, 0, 0, 0);
+            const endDate = new Date(event.endDate);
+            endDate.setHours(23, 59, 59, 999);
+            return startDate <= today && endDate >= today;
+          });
+          break;
+        case 'participated':
+          data = await eventService.getRegisteredEvents();
+          data = data.sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+          break;
+        default:
+          data = await eventService.getMyEvents();
+      }
+
+      // Set events immediately without brochures for fast initial render
+      setEvents(data);
+      setLoading(false);
+
+      // Load brochures in background for first few events only
+      if (data.length > 0) {
+        const priorityEvents = data.slice(0, INITIAL_RENDER_COUNT);
+        const eventsWithBrochures = await Promise.all(
+          priorityEvents.map(async (event, index) => {
+            try {
+              // Add delay to prevent overwhelming the server
+              if (index > 0) {
+                await new Promise(resolve => setTimeout(resolve, 100 * index));
+              }
+              const brochureData = await eventService.getEventBrochure(event.id);
+              return {...event, brochure: brochureData};
+            } catch (error) {
+              return event;
+            }
+          })
+        );
+
+        // Update only the first few events with brochures
+        setEvents(prevEvents => {
+          const updated = [...prevEvents];
+          eventsWithBrochures.forEach((eventWithBrochure, index) => {
+            if (updated[index]) {
+              updated[index] = eventWithBrochure;
+            }
+          });
+          return updated;
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load events:', error);
+      setLoading(false);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [activeTab]);
+
+  // Background fetch for remaining data
+  const fetchAllEventsDataBackground = useCallback(async () => {
     try {
       const [myEventsData, ongoingEventsData, registeredEventsData] =
         await Promise.all([
@@ -207,168 +275,92 @@ const HomeScreen = ({navigation}) => {
           eventService.getRegisteredEvents(),
         ]);
 
-      // Add brochure info for each category
-      const processEvents = async eventsArray => {
-        return await Promise.all(
-          eventsArray.map(async event => {
-            try {
-              const brochureData = await eventService.getEventBrochure(
-                event.id,
-              );
-              return {...event, brochure: brochureData};
-            } catch (error) {
-              return event;
-            }
-          }),
-        );
-      };
-
-      const [
-        myEventsWithBrochures,
-        ongoingEventsWithBrochures,
-        registeredEventsWithBrochures,
-      ] = await Promise.all([
-        processEvents(myEventsData),
-        processEvents(ongoingEventsData),
-        processEvents(registeredEventsData),
-      ]);
-
       setAllEventsData({
-        myEvents: myEventsWithBrochures,
-        ongoingEvents: ongoingEventsWithBrochures,
-        registeredEvents: registeredEventsWithBrochures,
+        myEvents: myEventsData,
+        ongoingEvents: ongoingEventsData,
+        registeredEvents: registeredEventsData,
       });
     } catch (error) {
       console.error('Failed to load all events data:', error);
     }
-  };
+  }, []);
 
-  // Update the fetchEvents function to filter ongoing events for today only
-  const fetchEvents = async () => {
-    try {
-      setLoading(true);
-      // Fetch events based on active tab
-      let data;
-      switch (activeTab) {
-        case 'my':
-          data = await eventService.getMyEvents();
-          break;
-        case 'ongoing':
-          // Get all events first
-          data = await eventService.getOngoingEvents();
+  // Optimized marked dates generation
+  const generateMarkedDates = useCallback((allEvents) => {
+    const marks = {};
+    const colors = {
+      myEvents: '#2e7af5',
+      ongoingEvents: '#4CAF50',
+      registeredEvents: '#FF9800'
+    };
 
-          // Filter to show only events scheduled for today
-          const today = new Date();
-          today.setHours(0, 0, 0, 0); // Reset time to start of day
+    Object.keys(allEvents).forEach(category => {
+      const eventsArray = allEvents[category];
+      const color = colors[category];
 
-          const tomorrow = new Date(today);
-          tomorrow.setDate(tomorrow.getDate() + 1); // Get tomorrow's date
+      eventsArray.forEach(event => {
+        if (!event.startDate || !event.endDate) return;
 
-          // Filter events that are happening today (current date falls between start and end dates)
-          data = data.filter(event => {
-            const startDate = new Date(event.startDate);
-            startDate.setHours(0, 0, 0, 0);
+        try {
+          const startParts = event.startDate.split('T')[0].split('-');
+          const endParts = event.endDate.split('T')[0].split('-');
 
-            const endDate = new Date(event.endDate);
-            endDate.setHours(23, 59, 59, 999); // End of day
-
-            return startDate <= today && endDate >= today;
-          });
-          break;
-        case 'participated':
-          // Get registered events (full details) when participated tab is selected
-          data = await eventService.getRegisteredEvents();
-          // Sort by start date (newest first)
-          data = data.sort(
-            (a, b) => new Date(b.startDate) - new Date(a.startDate),
+          const start = new Date(
+            parseInt(startParts[0]),
+            parseInt(startParts[1]) - 1,
+            parseInt(startParts[2]),
           );
-          break;
-        case 'recommended':
-          data = await eventService.getRecommendedEvents();
-          break;
-        default:
-          data = await eventService.getMyEvents();
-      }
 
-      // Fetch brochure info for each event
-      const eventsWithBrochures = await Promise.all(
-        data.map(async event => {
-          try {
-            const brochureData = await eventService.getEventBrochure(event.id);
-            return {...event, brochure: brochureData};
-          } catch (error) {
-            // If no brochure or error, return event without brochure
-            return event;
+          const end = new Date(
+            parseInt(endParts[0]),
+            parseInt(endParts[1]) - 1,
+            parseInt(endParts[2]),
+          );
+
+          const currentDate = new Date(start);
+          while (currentDate <= end) {
+            const dateString = currentDate.toISOString().split('T')[0];
+
+            if (!marks[dateString]) {
+              marks[dateString] = {
+                dots: [{ color, key: category }],
+                selected: true,
+                selectedColor: color
+              };
+            } else if (!marks[dateString].dots.some(dot => dot.color === color)) {
+              marks[dateString].dots.push({ color, key: category });
+            }
+
+            currentDate.setDate(currentDate.getDate() + 1);
           }
-        }),
-      );
-
-      setEvents(eventsWithBrochures);
-    } catch (error) {
-      console.error('Failed to load events:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  // Update useEffect to fetch registered events and all events data
-  useEffect(() => {
-    fetchEvents();
-    fetchRegisteredEvents();
-    fetchAllEventsData(); // Add this line
-    if (user) fetchProfileImage();
-
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchEvents();
-      fetchRegisteredEvents();
-      fetchAllEventsData(); // Add this line
-      if (user) fetchProfileImage();
+        } catch (error) {
+          console.error('Error processing event date:', error);
+        }
+      });
     });
 
-    return unsubscribe;
-  }, [navigation, activeTab]);
+    return marks;
+  }, []);
 
-  // Update onRefresh to include all events data
-  const onRefresh = () => {
-    setRefreshing(true);
-    Promise.all([fetchEvents(), fetchRegisteredEvents(), fetchAllEventsData()]);
-  };
-
-  // Format date function (reused from MyEventsScreen)
-  const formatDate = dateString => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  // Update the renderEventItem function to fix the layout
-
-  const renderEventItem = ({item}) => (
+  // Memoized renderEventItem
+  const renderEventItem = useCallback(({item}) => (
     <TouchableOpacity
       style={styles.eventCard}
       onPress={() => navigation.navigate('EventDetails', {eventId: item.id})}>
-      {/* Event Header with Status Badge */}
       <View style={styles.eventHeader}>
-        <View>
+        <View style={styles.eventHeaderText}>
           <Text style={styles.eventType}>{item.type}</Text>
-          <Text style={styles.eventTitle}>{item.title}</Text>
+          <Text style={styles.eventTitle} numberOfLines={1}>{item.title}</Text>
         </View>
         <EventStatusBadge status={item.status} />
       </View>
 
-      {/* Brochure Preview - Repositioned below the header */}
       {item.brochure && (
         <View style={styles.brochureTagContainer}>
           <TouchableOpacity
             style={styles.brochureTag}
-            onPress={() =>
-              navigation.navigate('EventDetails', {eventId: item.id})
-            }>
-            <Icon name="file-pdf-box" size={20} color="#e53935" />
+            onPress={() => navigation.navigate('EventDetails', {eventId: item.id})}>
+            <Icon name="file-pdf-box" size={16} color="#e53935" />
             <Text style={styles.brochureTagText}>View Brochure</Text>
           </TouchableOpacity>
         </View>
@@ -380,19 +372,25 @@ const HomeScreen = ({navigation}) => {
 
       <View style={styles.eventDetails}>
         <View style={styles.detailItem}>
-          <Icon name="calendar-range" size={16} color="#666" />
-          <Text style={styles.detailText}>
-            {formatDate(item.startDate)} - {formatDate(item.endDate)}
+          <Icon name="calendar-range" size={14} color="#666" />
+          <Text style={styles.detailText} numberOfLines={1}>
+            {new Date(item.startDate).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+            })} - {new Date(item.endDate).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+            })}
           </Text>
         </View>
 
         <View style={styles.detailItem}>
           <Icon
             name={item.mode === 'Virtual' ? 'video' : 'map-marker'}
-            size={16}
+            size={14}
             color="#666"
           />
-          <Text style={styles.detailText}>
+          <Text style={styles.detailText} numberOfLines={1}>
             {item.mode}: {item.venue}
           </Text>
         </View>
@@ -401,9 +399,7 @@ const HomeScreen = ({navigation}) => {
       <View style={styles.eventActions}>
         <TouchableOpacity
           style={styles.eventButton}
-          onPress={() =>
-            navigation.navigate('EventDetails', {eventId: item.id})
-          }>
+          onPress={() => navigation.navigate('EventDetails', {eventId: item.id})}>
           <Text style={styles.eventButtonText}>View Details</Text>
         </TouchableOpacity>
 
@@ -411,37 +407,39 @@ const HomeScreen = ({navigation}) => {
           user?.id !== item.organizer_id &&
           user?.id !== item.created_by?.id &&
           (registeredEvents.includes(item.id) ? (
-            <TouchableOpacity
-              style={[styles.eventButton, styles.registeredButton]}
-              disabled={true}>
-              <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                <Icon name="check-circle" size={14} color="#fff" />
-                <Text style={[styles.registeredButtonText, {marginLeft: 5}]}>
-                  Registered
-                </Text>
-              </View>
-            </TouchableOpacity>
+            <View style={[styles.eventButton, styles.registeredButton]}>
+              <Icon name="check-circle" size={12} color="#fff" />
+              <Text style={styles.registeredButtonText}>Registered</Text>
+            </View>
           ) : (
             <TouchableOpacity
               style={[styles.eventButton, styles.registerButton]}
-              onPress={() =>
-                navigation.navigate('EventRegistration', {eventId: item.id})
-              }>
+              onPress={() => navigation.navigate('EventRegistration', {eventId: item.id})}>
               <Text style={styles.registerButtonText}>Register</Text>
             </TouchableOpacity>
           ))}
       </View>
     </TouchableOpacity>
-  );
+  ), [navigation, user, registeredEvents]);
 
-  // Add search filtering effect
+  // Load more functionality
+  const handleLoadMore = useCallback(() => {
+    if (!initialRenderComplete) {
+      setInitialRenderComplete(true);
+    }
+  }, [initialRenderComplete]);
+
+  // Effects with optimizations
+  useEffect(() => {
+    calculateStats(allEventsData);
+  }, [allEventsData, calculateStats]);
+
   useEffect(() => {
     if (events.length > 0) {
-      const filtered = events.filter(
-        event =>
-          event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          event.venue.toLowerCase().includes(searchTerm.toLowerCase()),
+      const filtered = events.filter(event =>
+        event.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        event.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        event.venue?.toLowerCase().includes(searchTerm.toLowerCase()),
       );
       setFilteredEvents(filtered);
     } else {
@@ -449,111 +447,66 @@ const HomeScreen = ({navigation}) => {
     }
   }, [searchTerm, events]);
 
-  // Updated function to generate unified marked dates with different colors
-  const generateUnifiedMarkedDates = allEvents => {
-    const marks = {};
-
-    // Define colors and priorities for each category
-    const colors = {
-      myEvents: '#2e7af5',        // Blue for my events
-      ongoingEvents: '#4CAF50',   // Green for ongoing events
-      registeredEvents: '#FF9800' // Orange for registered events
-    };
-    // Change this line - put ongoingEvents first so it gets priority for circles
-    const priorities = ['ongoingEvents', 'myEvents', 'registeredEvents'];
-
-    // Process each category
-    Object.keys(allEvents).forEach(category => {
-      const eventsArray = allEvents[category];
-      const color = colors[category];
-
-      eventsArray.forEach(event => {
-        if (!event.startDate || !event.endDate) return;
-
-        // Parse dates carefully to avoid timezone issues
-        const startParts = event.startDate.split('T')[0].split('-');
-        const endParts = event.endDate.split('T')[0].split('-');
-
-        const start = new Date(
-          parseInt(startParts[0]),
-          parseInt(startParts[1]) - 1,
-          parseInt(startParts[2]),
-        );
-
-        const end = new Date(
-          parseInt(endParts[0]),
-          parseInt(endParts[1]) - 1,
-          parseInt(endParts[2]),
-        );
-
-        // Generate all dates in the range
-        const currentDate = new Date(start);
-        while (currentDate <= end) {
-          const year = currentDate.getFullYear();
-          const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-          const day = String(currentDate.getDate()).padStart(2, '0');
-          const dateString = `${year}-${month}-${day}`;
-
-          // Always use dots array for multi-dot marking
-          if (!marks[dateString]) {
-            marks[dateString] = { dots: [{ color, key: category }], categories: [category] };
-          } else {
-            // Only add the color if it's not already present
-            if (!marks[dateString].dots.some(dot => dot.color === color)) {
-              marks[dateString].dots.push({ color, key: category });
-              marks[dateString].categories.push(category);
-            }
-          }
-
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
-      });
-    });
-
-    // Now, for each date, set selected/selectedColor based on priority
-    Object.keys(marks).forEach(dateString => {
-      const cats = marks[dateString].categories;
-      for (let i = 0; i < priorities.length; i++) {
-        if (cats.includes(priorities[i])) {
-          marks[dateString].selected = true;
-          marks[dateString].selectedColor = colors[priorities[i]];
-          break;
-        }
-      }
-      // Remove helper property
-      delete marks[dateString].categories;
-    });
-
-    return marks;
-  };
-
-  // Update the useEffect for marked dates to use unified data
   useEffect(() => {
     if (
       allEventsData.myEvents.length > 0 ||
       allEventsData.ongoingEvents.length > 0 ||
       allEventsData.registeredEvents.length > 0
     ) {
-      try {
-        const marks = generateUnifiedMarkedDates(allEventsData);
-        setMarkedDates(marks);
-      } catch (error) {
-        console.error('Error generating unified marked dates:', error);
-        setMarkedDates({});
-      }
-    } else {
-      setMarkedDates({});
+      const marks = generateMarkedDates(allEventsData);
+      setMarkedDates(marks);
     }
-  }, [allEventsData]);
+  }, [allEventsData, generateMarkedDates]);
+
+  // Initial load effect
+  useEffect(() => {
+    const loadInitialData = async () => {
+      // Load critical data first
+      await Promise.all([
+        fetchEventsQuick(),
+        fetchRegisteredEvents(),
+      ]);
+
+      // Load profile image and background data
+      setTimeout(() => {
+        if (user) fetchProfileImage();
+        fetchAllEventsDataBackground();
+      }, 500);
+
+      // Mark initial render complete
+      setTimeout(() => {
+        setInitialRenderComplete(true);
+      }, 1000);
+    };
+
+    loadInitialData();
+
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchEventsQuick();
+      fetchRegisteredEvents();
+    });
+
+    return unsubscribe;
+  }, [navigation, activeTab, fetchEventsQuick, fetchRegisteredEvents, fetchProfileImage, fetchAllEventsDataBackground, user]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    Promise.all([
+      fetchEventsQuick(),
+      fetchRegisteredEvents(),
+      fetchAllEventsDataBackground()
+    ]);
+  }, [fetchEventsQuick, fetchRegisteredEvents, fetchAllEventsDataBackground]);
 
   return (
     <SafeAreaView style={[styles.container, {paddingTop: insets.top}]}>
       <StatusBar barStyle="dark-content" backgroundColor="white" />
+      
       {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.welcomeText}>
-            {getGreeting()}, {getFormattedName()}
+            {greeting}, {formattedName}
           </Text>
           <Text style={styles.subtitleText}>
             {user?.role === 'doctor'
@@ -564,7 +517,6 @@ const HomeScreen = ({navigation}) => {
           </Text>
         </View>
 
-        {/* Replace the profile icon with this */}
         <TouchableOpacity
           style={styles.profileIconContainer}
           onPress={() => navigation.navigate('Profile')}>
@@ -585,12 +537,13 @@ const HomeScreen = ({navigation}) => {
         style={styles.scrollView}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }>
+        }
+        showsVerticalScrollIndicator={false}>
+        
         <View style={styles.statsContainer}>
-          {/* Upcoming Conferences Card */}
           <View style={[styles.card, styles.widerCard]}>
             <View style={styles.cardHeader}>
-              <Ionicons name="people-outline" size={24} color={'#ffffff'} />
+              <Ionicons name="people-outline" size={24} color="#ffffff" />
               <Text style={styles.cardTitle}>Upcoming Events</Text>
             </View>
             <Text style={styles.statNumber}>{stats.upcomingEvents}</Text>
@@ -601,10 +554,9 @@ const HomeScreen = ({navigation}) => {
             </Text>
           </View>
 
-          {/* Meetings This Week Card */}
           <View style={[styles.card, styles.widerCard]}>
             <View style={styles.cardHeader}>
-              <Ionicons name="calendar-outline" size={24} color={'#ffffff'} />
+              <Ionicons name="calendar-outline" size={24} color="#ffffff" />
               <Text style={styles.cardTitle}>Events This Week</Text>
             </View>
             <Text style={styles.statNumber}>{stats.meetingsThisWeek}</Text>
@@ -620,76 +572,40 @@ const HomeScreen = ({navigation}) => {
 
         {/* Events Tabs */}
         <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'my' && styles.activeTab]}
-            onPress={() => setActiveTab('my')}>
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'my' && styles.activeTabText,
-              ]}>
-              My Events
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'ongoing' && styles.activeTab]}
-            onPress={() => setActiveTab('ongoing')}>
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'ongoing' && styles.activeTabText,
-              ]}>
-              Ongoing Events
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === 'participated' && styles.activeTab,
-            ]}
-            onPress={() => setActiveTab('participated')}>
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'participated' && styles.activeTabText,
-              ]}>
-              Registered Events
-            </Text>
-          </TouchableOpacity>
+          {['my', 'ongoing', 'participated'].map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, activeTab === tab && styles.activeTab]}
+              onPress={() => setActiveTab(tab)}>
+              <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+                {tab === 'my' ? 'My Events' : 
+                 tab === 'ongoing' ? 'Ongoing Events' : 'Registered Events'}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
-            <Icon
-              name="magnify"
-              size={20}
-              color="#666"
-              style={styles.searchIcon}
-            />
+            <Icon name="magnify" size={18} color="#666" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder={`Search ${
-                activeTab === 'my'
-                  ? 'my'
-                  : activeTab === 'ongoing'
-                  ? 'ongoing'
-                  : 'participated'
-              } events...`}
+              placeholder={`Search ${activeTab} events...`}
               value={searchTerm}
               onChangeText={setSearchTerm}
               placeholderTextColor="#999"
             />
             {searchTerm !== '' && (
               <TouchableOpacity onPress={() => setSearchTerm('')}>
-                <Icon name="close-circle" size={18} color="#999" />
+                <Icon name="close-circle" size={16} color="#999" />
               </TouchableOpacity>
             )}
           </View>
           <TouchableOpacity
             style={styles.calendarIconButton}
             onPress={() => setShowCalendar(!showCalendar)}>
-            <Icon name="calendar" size={22} color="#2e7af5" />
+            <Icon name="calendar" size={20} color="#2e7af5" />
           </TouchableOpacity>
         </View>
 
@@ -700,28 +616,20 @@ const HomeScreen = ({navigation}) => {
               <ActivityIndicator size="large" color="#2e7af5" />
               <Text style={styles.loadingText}>Loading events...</Text>
             </View>
-          ) : filteredEvents.length === 0 && searchTerm !== '' ? (
-            <View style={styles.emptyContainer}>
-              <Icon name="magnify-off" size={64} color="#ccc" />
-              <Text style={styles.emptyTitle}>No Events Found</Text>
-              <Text style={styles.emptySubtitle}>
-                No events match your search criteria. Please try another term.
-              </Text>
-            </View>
-          ) : events.length === 0 ? (
+          ) : eventsToDisplay.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Icon name="calendar-blank" size={64} color="#ccc" />
               <Text style={styles.emptyTitle}>No Events Found</Text>
               <Text style={styles.emptySubtitle}>
-                {activeTab === 'my'
-                  ? 'Create your first medical event or browse recommended events'
+                {searchTerm !== '' 
+                  ? 'No events match your search criteria.'
+                  : activeTab === 'my'
+                  ? 'Create your first medical event'
                   : activeTab === 'ongoing'
-                  ? 'There are no ongoing events at the moment'
-                  : activeTab === 'participated'
-                  ? "You haven't registered for any events yet"
-                  : "We don't have any recommendations for you yet"}
+                  ? 'No ongoing events at the moment'
+                  : "You haven't registered for any events yet"}
               </Text>
-              {activeTab === 'my' && (
+              {activeTab === 'my' && searchTerm === '' && (
                 <TouchableOpacity
                   style={styles.createEventButton}
                   onPress={() => navigation.navigate('CreateConference')}>
@@ -731,17 +639,40 @@ const HomeScreen = ({navigation}) => {
             </View>
           ) : (
             <FlatList
-              data={filteredEvents.length > 0 ? filteredEvents : events}
+              data={eventsToDisplay}
               renderItem={renderEventItem}
-              keyExtractor={item => item.id}
+              keyExtractor={(item) => item.id}
               scrollEnabled={false}
-              nestedScrollEnabled={true}
+              nestedScrollEnabled={false}
+              initialNumToRender={INITIAL_RENDER_COUNT}
+              maxToRenderPerBatch={3}
+              windowSize={5}
+              updateCellsBatchingPeriod={50}
+              removeClippedSubviews={true}
+              getItemLayout={(data, index) => ({
+                length: 250,
+                offset: 250 * index,
+                index,
+              })}
+              ListFooterComponent={() => {
+                const totalEvents = filteredEvents.length > 0 ? filteredEvents : events;
+                if (!initialRenderComplete && totalEvents.length > INITIAL_RENDER_COUNT) {
+                  return (
+                    <TouchableOpacity style={styles.loadMoreButton} onPress={handleLoadMore}>
+                      <Text style={styles.loadMoreButtonText}>
+                        Load {totalEvents.length - INITIAL_RENDER_COUNT} more events
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                }
+                return null;
+              }}
             />
           )}
         </View>
       </ScrollView>
 
-      {/* Calendar Overlay with Updated Legend */}
+      {/* Calendar Overlay */}
       {showCalendar && (
         <View style={styles.calendarOverlay}>
           <View style={styles.calendarContainer}>
@@ -753,7 +684,7 @@ const HomeScreen = ({navigation}) => {
             </View>
 
             <Calendar
-              markingType="multi-dot" // <-- Add this line
+              markingType="multi-dot"
               markedDates={markedDates}
               hideExtraDays={true}
               enableSwipeMonths={true}
@@ -775,22 +706,16 @@ const HomeScreen = ({navigation}) => {
 
             <View style={styles.calendarLegend}>
               <View style={styles.legendItem}>
-                <View
-                  style={[styles.legendDot, {backgroundColor: '#2e7af5'}]}
-                />
-                <Text style={styles.legendText}>My Events    </Text>
+                <View style={[styles.legendDot, {backgroundColor: '#2e7af5'}]} />
+                <Text style={styles.legendText}>My Events</Text>
               </View>
               <View style={styles.legendItem}>
-                <View
-                  style={[styles.legendDot, {backgroundColor: '#4CAF50'}]}
-                />
-                <Text style={styles.legendText}>Ongoing Events   </Text>
+                <View style={[styles.legendDot, {backgroundColor: '#4CAF50'}]} />
+                <Text style={styles.legendText}>Ongoing Events</Text>
               </View>
               <View style={styles.legendItem}>
-                <View
-                  style={[styles.legendDot, {backgroundColor: '#FF9800'}]}
-                />
-                <Text style={styles.legendText}>Registered Events </Text>
+                <View style={[styles.legendDot, {backgroundColor: '#FF9800'}]} />
+                <Text style={styles.legendText}>Registered Events</Text>
               </View>
             </View>
           </View>
@@ -800,6 +725,7 @@ const HomeScreen = ({navigation}) => {
   );
 };
 
+// Update styles for better performance
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -821,11 +747,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f8f8',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
     overflow: 'hidden',
   },
   profileImage: {
@@ -861,37 +782,21 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
     padding: 16,
   },
   card: {
-    width: '32%',
     backgroundColor: '#2e7af5',
     borderRadius: 20,
     padding: 16,
-    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.05,
     shadowRadius: 3,
     elevation: 2,
   },
-
-  // Add style for wider cards (since we now have 2 instead of 3)
   widerCard: {
-    width: '48%', // Make cards take up almost half the width
-  },
-  registeredButton: {
-    backgroundColor: '#4caf50',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  registeredButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '500',
+    width: '48%',
   },
   cardHeader: {
     justifyContent: 'center',
@@ -992,6 +897,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 8,
   },
+  eventHeaderText: {
+    flex: 1,
+    marginRight: 8,
+  },
   eventType: {
     fontSize: 13,
     color: '#2e7af5',
@@ -999,13 +908,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   eventTitle: {
-  fontSize: 18,
-  fontWeight: 'bold',
-  color: '#333',
-  marginRight: 8,
-  maxWidth: '80%',
-  numberOfLines: 1, 
-},
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1016,6 +922,26 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  brochureTagContainer: {
+    marginBottom: 8,
+  },
+  brochureTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFF8F8',
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#FFCDD2',
+  },
+  brochureTagText: {
+    color: '#e53935',
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 4,
   },
   eventDescription: {
     fontSize: 14,
@@ -1029,16 +955,18 @@ const styles = StyleSheet.create({
   detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   detailText: {
     fontSize: 14,
     color: '#666',
     marginLeft: 8,
+    flex: 1,
   },
   eventActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
@@ -1055,11 +983,24 @@ const styles = StyleSheet.create({
   },
   registerButton: {
     backgroundColor: '#2e7af5',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   registerButtonText: {
     color: 'white',
     fontSize: 14,
     fontWeight: '500',
+  },
+  registeredButton: {
+    backgroundColor: '#4caf50',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  registeredButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 4,
   },
   loadingContainer: {
     padding: 32,
@@ -1100,48 +1041,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  brochureTagContainer: {
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  brochureTag: {
-    flexDirection: 'row',
+  loadMoreButton: {
+    backgroundColor: '#2e7af5',
+    marginHorizontal: 16,
+    marginVertical: 10,
+    paddingVertical: 12,
+    borderRadius: 8,
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#FFF8F8',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: '#FFCDD2',
   },
-  brochureTagText: {
-    color: '#e53935',
-    fontSize: 12,
+  loadMoreButtonText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '500',
-    marginLeft: 4,
-  },
-  brochurePreviewContainer: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    zIndex: 1,
-  },
-  brochurePreview: {
-    backgroundColor: 'rgba(245, 245, 245, 0.95)',
-    borderTopRightRadius: 12,
-    borderBottomLeftRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brochureText: {
-    color: '#e53935',
-    fontSize: 12,
-    fontWeight: '500',
-    marginLeft: 4,
   },
   calendarOverlay: {
     position: 'absolute',
@@ -1178,7 +1089,7 @@ const styles = StyleSheet.create({
   },
   calendarLegend: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-around',
     marginTop: 16,
   },
   legendItem: {
@@ -1189,7 +1100,6 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#FFA500',
     marginRight: 6,
   },
   legendText: {

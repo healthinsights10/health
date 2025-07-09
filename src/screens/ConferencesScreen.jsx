@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback, useMemo} from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,7 @@ import {
   SafeAreaView,
   TouchableOpacity,
   TextInput,
-  ScrollView,
+  FlatList,
   StatusBar,
   Platform,
   ActivityIndicator,
@@ -16,25 +16,34 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AntDesignIcon from 'react-native-vector-icons/AntDesign';
 import {Calendar} from 'react-native-calendars';
-import {eventService} from '../services/api'; // Import the API service
+import {eventService} from '../services/api';
 import {useAuth} from '../context/AuthContext';
-import {
-  SafeAreaInsetsContext,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 const ConferencesScreen = ({navigation}) => {
-  const {user} = useAuth(); // Get current user
+  const {user} = useAuth();
+  const insets = useSafeAreaInsets();
+
+  // Performance constants
+  const INITIAL_RENDER_COUNT = 4;
+  const LOAD_MORE_COUNT = 6;
+
+  // Performance optimization states
+  const [initialRenderComplete, setInitialRenderComplete] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // Core states
   const [activeTab, setActiveTab] = useState('All Events');
   const [searchQuery, setSearchQuery] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
-  const [events, setEvents] = useState([]); // State for events
-  const [loading, setLoading] = useState(true); // State for loading
-  const [registeredEvents, setRegisteredEvents] = useState([]); // Add this state
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [registeredEvents, setRegisteredEvents] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
-  const insets = useSafeAreaInsets();
-  const formatDate = dateString => {
+
+  // Memoized date and time formatters
+  const formatDate = useCallback((dateString) => {
     const options = {
       weekday: 'short',
       month: 'short',
@@ -42,22 +51,20 @@ const ConferencesScreen = ({navigation}) => {
       year: 'numeric',
     };
     return new Date(dateString).toLocaleDateString('en-US', options);
-  };
+  }, []);
 
-  // Helper function to format time
-  const formatTime = timeString => {
+  const formatTime = useCallback((timeString) => {
     if (!timeString) return '';
     return new Date(`2000-01-01T${timeString}`).toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
     });
-  };
+  }, []);
 
-  // Add this new component for rendering multi-day date information
-  const renderEventDates = (event, eventDays = []) => {
+  // Memoized event dates renderer
+  const renderEventDates = useCallback((event, eventDays = []) => {
     if (eventDays && eventDays.length > 1) {
-      // Multi-day event
       return (
         <View style={styles.multiDayContainer}>
           <View style={styles.eventDetailItem}>
@@ -68,8 +75,7 @@ const ConferencesScreen = ({navigation}) => {
             </Text>
           </View>
 
-          {/* Show first 2 days with times */}
-          {eventDays.slice(0, 2).map((day, index) => (
+          {eventDays.slice(0, 2).map((day) => (
             <View key={day.day_number} style={styles.dayTimeItem}>
               <Icon name="clock" size={14} color="#888" />
               <Text style={styles.dayTimeText}>
@@ -87,7 +93,6 @@ const ConferencesScreen = ({navigation}) => {
         </View>
       );
     } else {
-      // Single day event
       return (
         <>
           <View style={styles.eventDetailItem}>
@@ -106,28 +111,93 @@ const ConferencesScreen = ({navigation}) => {
         </>
       );
     }
-  };
+  }, [formatDate, formatTime]);
 
-  // Update the fetchEvents function to include event days
-  const fetchEvents = async () => {
+  // Optimized fetch functions
+  const fetchEventsQuick = useCallback(async () => {
     try {
       setLoading(true);
       const data = await eventService.getAllEvents();
 
-      // Fetch brochure info and event days for each event
-      const eventsWithAdditionalData = await Promise.all(
-        data.map(async event => {
-          try {
-            // Fetch brochure
-            const brochureData = await eventService.getEventBrochure(event.id);
+      // Sort and filter out past events immediately
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-            // Fetch event days
-            let eventDays = [];
+      const upcomingEvents = data
+        .filter(event => new Date(event.start_date) >= today)
+        .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+
+      // Set events immediately without brochures for fast initial render
+      setEvents(upcomingEvents);
+      setLoading(false);
+
+      // Load additional data for first few events only
+      if (upcomingEvents.length > 0) {
+        const priorityEvents = upcomingEvents.slice(0, INITIAL_RENDER_COUNT);
+        
+        // Load brochures and event days progressively
+        const eventsWithAdditionalData = await Promise.all(
+          priorityEvents.map(async (event, index) => {
             try {
-              eventDays = await eventService.getEventDays(event.id);
+              // Add staggered delay to prevent server overload
+              if (index > 0) {
+                await new Promise(resolve => setTimeout(resolve, 100 * index));
+              }
+
+              const [brochureData, eventDays] = await Promise.all([
+                eventService.getEventBrochure(event.id).catch(() => null),
+                eventService.getEventDays(event.id).catch(() => [])
+              ]);
+
+              return {
+                ...event,
+                brochure: brochureData,
+                eventDays: eventDays || [],
+              };
             } catch (error) {
-              console.log('No event days found for event:', event.id);
+              return {
+                ...event,
+                eventDays: [],
+              };
             }
+          })
+        );
+
+        // Update only the first few events with additional data
+        setEvents(prevEvents => {
+          const updated = [...prevEvents];
+          eventsWithAdditionalData.forEach((eventWithData, index) => {
+            if (updated[index]) {
+              updated[index] = eventWithData;
+            }
+          });
+          return updated;
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch events:', error);
+      Alert.alert('Error', 'Failed to load events.');
+      setLoading(false);
+    }
+  }, []);
+
+  // Background fetch for remaining events
+  const loadRemainingEventsData = useCallback(async () => {
+    if (events.length <= INITIAL_RENDER_COUNT) return;
+
+    try {
+      const remainingEvents = events.slice(INITIAL_RENDER_COUNT);
+      
+      const eventsWithAdditionalData = await Promise.all(
+        remainingEvents.map(async (event, index) => {
+          try {
+            // Longer delay for background loading
+            await new Promise(resolve => setTimeout(resolve, 200 * index));
+
+            const [brochureData, eventDays] = await Promise.all([
+              eventService.getEventBrochure(event.id).catch(() => null),
+              eventService.getEventDays(event.id).catch(() => [])
+            ]);
 
             return {
               ...event,
@@ -140,113 +210,89 @@ const ConferencesScreen = ({navigation}) => {
               eventDays: [],
             };
           }
-        }),
+        })
       );
 
-      // Sort events by start date
-      const sortedEvents = eventsWithAdditionalData.sort((a, b) => {
-        return new Date(a.start_date) - new Date(b.start_date);
+      // Update remaining events
+      setEvents(prevEvents => {
+        const updated = [...prevEvents];
+        eventsWithAdditionalData.forEach((eventWithData, index) => {
+          const targetIndex = INITIAL_RENDER_COUNT + index;
+          if (updated[targetIndex]) {
+            updated[targetIndex] = eventWithData;
+          }
+        });
+        return updated;
       });
-
-      setEvents(sortedEvents);
     } catch (error) {
-      console.error('Failed to fetch events:', error);
-      Alert.alert('Error', 'Failed to load events.');
-    } finally {
-      setLoading(false);
+      console.error('Error loading remaining events data:', error);
     }
-  };
+  }, [events.length]);
 
-  // Add onRefresh handler
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await Promise.all([fetchEvents(), fetchRegisteredEvents()]);
-    } catch (error) {
-      console.error('Error refreshing data:', error);
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
-
-  // Add function to fetch registered events
-  const fetchRegisteredEvents = async () => {
+  const fetchRegisteredEvents = useCallback(async () => {
     try {
       const data = await eventService.getRegisteredEvents();
       setRegisteredEvents(data.map(event => event.id));
     } catch (error) {
       console.error('Failed to fetch registered events:', error);
     }
-  };
-
-  useEffect(() => {
-    fetchEvents(); // Fetch events when the screen loads
-    fetchRegisteredEvents();
   }, []);
 
-  // Update the filtering logic in the component
-  const filteredEvents = events.filter(event => {
-    // Filter out past events - add this new code block first
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Set to beginning of day for proper comparison
-    const eventStartDate = new Date(event.start_date);
-
-    // Skip events that have already ended
-    if (eventStartDate < today) {
-      return false;
-    }
-
-    // Filter based on active tab
-    if (activeTab === 'Conferences' && event.type !== 'Conference') {
-      return false;
-    }
-
-    if (activeTab === 'Meetings' && event.type !== 'Meeting') {
-      return false;
-    }
-
-    // Filter based on search query (search in title, description and organizer)
-    if (searchQuery) {
-      const searchTerm = searchQuery.toLowerCase();
-      const matchesSearch =
-        event.title.toLowerCase().includes(searchTerm) ||
-        event.description.toLowerCase().includes(searchTerm) ||
-        event.organizer_name.toLowerCase().includes(searchTerm);
-
-      if (!matchesSearch) {
+  // Optimized filtering with useMemo
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => {
+      // Filter based on active tab
+      if (activeTab === 'Conferences' && event.type !== 'Conference') {
         return false;
       }
-    }
 
-    // Filter based on selected date
-    if (selectedDate) {
-      const eventStartDate = new Date(event.start_date);
-      const searchDate = new Date(selectedDate);
-
-      // Check if event date matches selected date
-      if (
-        eventStartDate.getDate() !== searchDate.getDate() ||
-        eventStartDate.getMonth() !== searchDate.getMonth() ||
-        eventStartDate.getFullYear() !== searchDate.getFullYear()
-      ) {
+      if (activeTab === 'Meetings' && event.type !== 'Meeting') {
         return false;
       }
+
+      // Filter based on search query
+      if (searchQuery) {
+        const searchTerm = searchQuery.toLowerCase();
+        const matchesSearch =
+          event.title.toLowerCase().includes(searchTerm) ||
+          event.description.toLowerCase().includes(searchTerm) ||
+          event.organizer_name.toLowerCase().includes(searchTerm);
+
+        if (!matchesSearch) {
+          return false;
+        }
+      }
+
+      // Filter based on selected date
+      if (selectedDate) {
+        const eventStartDate = new Date(event.start_date);
+        const searchDate = new Date(selectedDate);
+
+        if (
+          eventStartDate.getDate() !== searchDate.getDate() ||
+          eventStartDate.getMonth() !== searchDate.getMonth() ||
+          eventStartDate.getFullYear() !== searchDate.getFullYear()
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [events, activeTab, searchQuery, selectedDate]);
+
+  // Events to display with progressive loading
+  const eventsToDisplay = useMemo(() => {
+    if (!initialRenderComplete) {
+      return filteredEvents.slice(0, INITIAL_RENDER_COUNT);
     }
+    return filteredEvents;
+  }, [filteredEvents, initialRenderComplete]);
 
-    return true;
-  });
-
-  // Add a clear filters function
-  const clearFilters = () => {
-    setSearchQuery('');
-    setSelectedDate('');
-    setActiveTab('All Events');
-  };
-
-  // Update the renderEventCard function to include brochure thumbnail
-  const renderEventCard = event => (
-    <View style={styles.eventCard} key={event.id}>
-      {/* Brochure Preview - Only show if event has a brochure */}
+  // Memoized event card renderer
+  const renderEventCard = useCallback(({item: event}) => (
+    <View style={styles.eventCard}>
+      {/* Brochure Preview */}
       {event.brochure && (
         <View style={styles.brochurePreviewContainer}>
           <TouchableOpacity
@@ -271,11 +317,10 @@ const ConferencesScreen = ({navigation}) => {
         </View>
       </View>
 
-      <Text style={styles.eventTitle}>{event.title}</Text>
-      <Text style={styles.eventDescription}>{event.description}</Text>
+      <Text style={styles.eventTitle} numberOfLines={2}>{event.title}</Text>
+      <Text style={styles.eventDescription} numberOfLines={3}>{event.description}</Text>
 
       <View style={styles.eventDetails}>
-        {/* Use the new multi-day date renderer */}
         {renderEventDates(event, event.eventDays)}
 
         <View style={styles.eventDetailItem}>
@@ -284,13 +329,13 @@ const ConferencesScreen = ({navigation}) => {
             size={16}
             color="#666"
           />
-          <Text style={styles.eventDetailText}>
+          <Text style={styles.eventDetailText} numberOfLines={1}>
             {event.mode === 'Virtual' ? 'Virtual Event' : event.venue}
           </Text>
         </View>
         <View style={styles.eventDetailItem}>
           <Icon name="account-group" size={16} color="#666" />
-          <Text style={styles.eventDetailText}>{event.organizer_name}</Text>
+          <Text style={styles.eventDetailText} numberOfLines={1}>{event.organizer_name}</Text>
         </View>
       </View>
 
@@ -303,19 +348,16 @@ const ConferencesScreen = ({navigation}) => {
           <Text style={styles.eventButtonText}>View Details</Text>
         </TouchableOpacity>
 
-        {/* Only show register button if user is not the organizer */}
         {user?.id !== event.organizer_id &&
           (registeredEvents.includes(event.id) ? (
-            <TouchableOpacity
-              style={[styles.eventButton, styles.registeredButton]}
-              disabled={true}>
+            <View style={[styles.eventButton, styles.registeredButton]}>
               <View style={{flexDirection: 'row', alignItems: 'center'}}>
                 <AntDesignIcon name="checkcircle" size={14} color="#fff" />
                 <Text style={[styles.registeredButtonText, {marginLeft: 5}]}>
                   Registered
                 </Text>
               </View>
-            </TouchableOpacity>
+            </View>
           ) : (
             <TouchableOpacity
               style={[styles.eventButton, styles.registerButton]}
@@ -327,7 +369,61 @@ const ConferencesScreen = ({navigation}) => {
           ))}
       </View>
     </View>
-  );
+  ), [navigation, user, registeredEvents, renderEventDates]);
+
+  // Load more functionality
+  const handleLoadMore = useCallback(() => {
+    if (!initialRenderComplete) {
+      setInitialRenderComplete(true);
+      // Start loading remaining events data in background
+      setTimeout(() => {
+        loadRemainingEventsData();
+      }, 500);
+    }
+  }, [initialRenderComplete, loadRemainingEventsData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchEventsQuick(), fetchRegisteredEvents()]);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchEventsQuick, fetchRegisteredEvents]);
+
+  const clearFilters = useCallback(() => {
+    setSearchQuery('');
+    setSelectedDate('');
+    setActiveTab('All Events');
+  }, []);
+
+  // Effects
+  useEffect(() => {
+    const loadInitialData = async () => {
+      await Promise.all([
+        fetchEventsQuick(),
+        fetchRegisteredEvents(),
+      ]);
+
+      // Mark initial render complete after a delay
+      setTimeout(() => {
+        setInitialRenderComplete(true);
+        // Start loading remaining data
+        loadRemainingEventsData();
+      }, 1000);
+    };
+
+    loadInitialData();
+
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchEventsQuick();
+      fetchRegisteredEvents();
+    });
+
+    return unsubscribe;
+  }, [navigation, fetchEventsQuick, fetchRegisteredEvents, loadRemainingEventsData]);
 
   return (
     <SafeAreaView style={[styles.container, {paddingTop: insets.top}]}>
@@ -446,36 +542,69 @@ const ConferencesScreen = ({navigation}) => {
       </View>
 
       {/* Event Cards */}
-      {loading ? (
-        <ActivityIndicator
-          size="large"
-          color="#2e7af5"
-          style={{marginTop: 20}}
-        />
+      {loading && !refreshing ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2e7af5" />
+          <Text style={styles.loadingText}>Loading events...</Text>
+        </View>
+      ) : filteredEvents.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Icon name="calendar-blank" size={64} color="#ccc" />
+          <Text style={styles.emptyTitle}>No Upcoming Events</Text>
+          <Text style={styles.emptySubtitle}>
+            {searchQuery
+              ? 'No upcoming events match your search criteria'
+              : selectedDate
+              ? 'No events scheduled for the selected date'
+              : 'There are no upcoming events at this time'}
+          </Text>
+        </View>
       ) : (
-        <ScrollView
-          style={styles.scrollView}
+        <FlatList
+          data={eventsToDisplay}
+          renderItem={renderEventCard}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.eventsContainer}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }>
-          <View style={styles.eventsContainer}>
-            {filteredEvents.map(event => renderEventCard(event))}
-
-            {filteredEvents.length === 0 && !loading && (
-              <View style={styles.emptyContainer}>
-                <Icon name="calendar-blank" size={64} color="#ccc" />
-                <Text style={styles.emptyTitle}>No Upcoming Events</Text>
-                <Text style={styles.emptySubtitle}>
-                  {searchQuery
-                    ? 'No upcoming events match your search criteria'
-                    : selectedDate
-                    ? 'No events scheduled for the selected date'
-                    : 'There are no upcoming events at this time'}
-                </Text>
-              </View>
-            )}
-          </View>
-        </ScrollView>
+          }
+          // Performance optimizations
+          initialNumToRender={INITIAL_RENDER_COUNT}
+          maxToRenderPerBatch={4}
+          windowSize={8}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews={true}
+          getItemLayout={(data, index) => ({
+            length: 280, // Approximate height of event card
+            offset: 280 * index,
+            index,
+          })}
+          // Load more functionality
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={() => {
+            if (isLoadingMore && initialRenderComplete) {
+              return (
+                <View style={styles.loadingMoreContainer}>
+                  <ActivityIndicator size="small" color="#2e7af5" />
+                  <Text style={styles.loadingMoreText}>Loading more events...</Text>
+                </View>
+              );
+            }
+            if (!initialRenderComplete && filteredEvents.length > INITIAL_RENDER_COUNT) {
+              return (
+                <TouchableOpacity
+                  style={styles.loadMoreButton}
+                  onPress={handleLoadMore}>
+                  <Text style={styles.loadMoreButtonText}>
+                    Load {filteredEvents.length - INITIAL_RENDER_COUNT} more events
+                  </Text>
+                </TouchableOpacity>
+              );
+            }
+            return null;
+          }}
+        />
       )}
     </SafeAreaView>
   );
@@ -485,7 +614,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f7f9fc',
-    //paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     padding: 20,
@@ -544,20 +672,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#333',
-  },
-  filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 12,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 40,
-  },
-  filterButtonText: {
-    color: '#2e7af5',
-    marginHorizontal: 4,
-    fontSize: 14,
   },
   datePickerButton: {
     flexDirection: 'row',
@@ -624,11 +738,20 @@ const styles = StyleSheet.create({
     color: '#2e7af5',
     fontWeight: '500',
   },
-  scrollView: {
+  loadingContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
   },
   eventsContainer: {
     padding: 20,
+    paddingBottom: 80,
   },
   eventCard: {
     backgroundColor: 'white',
@@ -714,6 +837,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginLeft: 8,
+    flex: 1,
   },
   eventButtonContainer: {
     flexDirection: 'row',
@@ -771,8 +895,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     maxWidth: '80%',
   },
-
-  // Add these new styles for multi-day events
   multiDayContainer: {
     marginBottom: 8,
   },
@@ -793,6 +915,28 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginLeft: 20,
     marginTop: 4,
+  },
+  loadingMoreContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  loadingMoreText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#666',
+  },
+  loadMoreButton: {
+    backgroundColor: '#2e7af5',
+    marginHorizontal: 20,
+    marginVertical: 10,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  loadMoreButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 
