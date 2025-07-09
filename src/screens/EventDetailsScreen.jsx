@@ -614,7 +614,7 @@ const EventDetailsScreen = ({route, navigation}) => {
           {renderEventDays()}
         </View>
 
-        {/* Location Section - Updated for multi-day */}
+        Location Section - Updated for multi-day
         <View style={styles.detailSection}>
           <Text style={styles.sectionTitle}>Location</Text>
           <View style={styles.detailRow}>

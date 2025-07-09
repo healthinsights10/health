@@ -454,69 +454,12 @@ const handleTimeChange = (dayIndex, timeType, event, selectedTime) => {
         </View>
       </View>
 
-      {/* Venue for this day */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Venue (Day {index + 1})</Text>
-        <TextInput
-          style={styles.input}
-          placeholder={`Venue for day ${index + 1}`}
-          placeholderTextColor="#999"
-          value={day.venue}
-          onChangeText={(text) => updateEventDay(index, 'venue', text)}
-        />
-      </View>
-
-      {/* Venue Address */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Venue Address</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Full address of the venue"
-          placeholderTextColor="#999"
-          value={day.venueAddress}
-          onChangeText={(text) => updateEventDay(index, 'venueAddress', text)}
-        />
-      </View>
-
-      {/* Day Description */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Day Description</Text>
-        <TextInput
-          style={[styles.input, styles.textarea]}
-          placeholder={`What happens on day ${index + 1}?`}
-          placeholderTextColor="#999"
-          value={day.description}
-          onChangeText={(text) => updateEventDay(index, 'description', text)}
-          multiline={true}
-          numberOfLines={3}
-        />
-      </View>
-
-      {/* Capacity for this day */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Capacity (Day {index + 1})</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Maximum attendees for this day"
-          placeholderTextColor="#999"
-          value={day.capacity}
-          onChangeText={(text) => updateEventDay(index, 'capacity', text)}
-          keyboardType="number-pad"
-        />
-      </View>
-
-      {/* Special Notes */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Special Notes</Text>
-        <TextInput
-          style={[styles.input, styles.textarea]}
-          placeholder="Any special notes or instructions for this day"
-          placeholderTextColor="#999"
-          value={day.specialNotes}
-          onChangeText={(text) => updateEventDay(index, 'specialNotes', text)}
-          multiline={true}
-          numberOfLines={3}
-        />
+      {/* Note for admin editing */}
+      <View style={styles.adminNoteContainer}>
+        <Icon name="information" size={16} color="#2e7af5" />
+        <Text style={styles.adminNoteText}>
+          Additional details like venue and capacity for each day can be set by admin during approval.
+        </Text>
       </View>
     </View>
   );
@@ -1420,6 +1363,20 @@ const styles = StyleSheet.create({
   },
   removeSponsorButton: {
     padding: 4,
+  },
+  adminNoteContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e8f4fc',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 16,
+  },
+  adminNoteText: {
+    fontSize: 14,
+    color: '#333',
+    marginLeft: 8,
+    flex: 1,
   },
 });
 

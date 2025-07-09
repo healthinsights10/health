@@ -61,6 +61,10 @@ const AdminEditEventScreen = ({route, navigation}) => {
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
 
+  // Add multi-day event states
+  const [numberOfDays, setNumberOfDays] = useState(1);
+  const [eventDays, setEventDays] = useState([]);
+
   useEffect(() => {
     fetchEventDetails();
   }, [eventId]);
@@ -68,6 +72,15 @@ const AdminEditEventScreen = ({route, navigation}) => {
   const fetchEventDetails = async () => {
     try {
       const data = await eventService.getEventById(eventId);
+      
+      // Fetch event days
+      let eventDaysData = [];
+      try {
+        eventDaysData = await eventService.getEventDays(eventId);
+      } catch (error) {
+        console.log('No event days found for event:', eventId);
+      }
+
       setEventData({
         ...data,
         startDate: new Date(data.startDate),
@@ -77,6 +90,43 @@ const AdminEditEventScreen = ({route, navigation}) => {
         speakers: data.speakers || [],
         sponsors: data.sponsors || [],
       });
+
+      // Set event days data
+      if (eventDaysData && eventDaysData.length > 0) {
+        setNumberOfDays(eventDaysData.length);
+        const formattedEventDays = eventDaysData.map(day => ({
+          id: day.day_number,
+          date: new Date(day.date),
+          startTime: new Date(`2000-01-01T${day.start_time}`),
+          endTime: new Date(`2000-01-01T${day.end_time}`),
+          venue: day.venue || '',
+          venueAddress: day.venue_address || '',
+          description: day.description || '',
+          capacity: day.capacity ? day.capacity.toString() : '',
+          specialNotes: day.special_notes || '',
+          showDatePicker: false,
+          showStartTimePicker: false,
+          showEndTimePicker: false,
+        }));
+        setEventDays(formattedEventDays);
+      } else {
+        // Single day event fallback
+        setNumberOfDays(1);
+        setEventDays([{
+          id: 1,
+          date: new Date(data.startDate),
+          startTime: new Date(`2000-01-01T${data.start_time}`),
+          endTime: new Date(`2000-01-01T${data.end_time}`),
+          venue: data.venue || '',
+          venueAddress: '',
+          description: '',
+          capacity: data.capacity ? data.capacity.toString() : '',
+          specialNotes: '',
+          showDatePicker: false,
+          showStartTimePicker: false,
+          showEndTimePicker: false,
+        }]);
+      }
 
       // Set brochure if it exists
       if (data.brochure) {
@@ -127,8 +177,21 @@ const AdminEditEventScreen = ({route, navigation}) => {
     try {
       setSubmitting(true);
 
-      // Log the current brochure state to debug
-      console.log('Current brochure state:', brochure);
+      // Prepare event days data if multi-day event
+      let eventDaysData = null;
+      if (eventDays && eventDays.length > 0) {
+        eventDaysData = eventDays.map((day, index) => ({
+          dayNumber: index + 1,
+          date: formatDate(day.date),
+          startTime: formatTime(day.startTime),
+          endTime: formatTime(day.endTime),
+          venue: day.venue || '',
+          venueAddress: day.venueAddress || '',
+          description: day.description || '',
+          capacity: day.capacity ? parseInt(day.capacity) : null,
+          specialNotes: day.specialNotes || '',
+        }));
+      }
 
       const updatedEventData = {
         ...eventData,
@@ -136,8 +199,8 @@ const AdminEditEventScreen = ({route, navigation}) => {
         tags: eventData.tags
           ? eventData.tags.split(',').map(tag => tag.trim())
           : [],
-        // Explicitly include brochure in the update
         brochure: brochure,
+        eventDays: eventDaysData, // Include event days data
       };
 
       console.log('Sending updated data:', JSON.stringify(updatedEventData));
@@ -233,6 +296,10 @@ const AdminEditEventScreen = ({route, navigation}) => {
     return date.toISOString().split('T')[0];
   };
 
+  const formatTime = time => {
+    return time.toTimeString().split(' ')[0];
+  };
+
   // Render speaker item for the list
   const renderSpeakerItem = ({item}) => (
     <View style={styles.speakerItem}>
@@ -245,6 +312,194 @@ const AdminEditEventScreen = ({route, navigation}) => {
         onPress={() => removeSpeaker(item.id)}>
         <Icon name="close-circle" size={20} color="#ff4c4c" />
       </TouchableOpacity>
+    </View>
+  );
+
+  // Add these functions for multi-day handling
+  const handleNumberOfDaysChange = (days) => {
+    const numDays = parseInt(days) || 1;
+    setNumberOfDays(numDays);
+    
+    const newEventDays = [];
+    for (let i = 0; i < numDays; i++) {
+      if (eventDays[i]) {
+        // Keep existing data if available
+        newEventDays.push(eventDays[i]);
+      } else {
+        // Create new day with default values
+        const baseDate = eventDays[0]?.date || new Date();
+        const dayDate = new Date(baseDate);
+        dayDate.setDate(baseDate.getDate() + i);
+        
+        newEventDays.push({
+          id: i + 1,
+          date: dayDate,
+          startTime: new Date(),
+          endTime: new Date(new Date().setHours(new Date().getHours() + 2)),
+          venue: eventData.venue || '',
+          venueAddress: '',
+          description: '',
+          capacity: '',
+          specialNotes: '',
+          showDatePicker: false,
+          showStartTimePicker: false,
+          showEndTimePicker: false,
+        });
+      }
+    }
+    setEventDays(newEventDays);
+  };
+
+  // Update event day data
+  const updateEventDay = (dayIndex, field, value) => {
+    setEventDays(prevDays => {
+      const updatedDays = [...prevDays];
+      updatedDays[dayIndex] = {
+        ...updatedDays[dayIndex],
+        [field]: value,
+      };
+      return updatedDays;
+    });
+  };
+
+  // Add date and time change handlers
+  const handleEventDayDateChange = (dayIndex, event, selectedDate) => {
+    updateEventDay(dayIndex, 'showDatePicker', false);
+    if (event.type === 'set' && selectedDate) {
+      updateEventDay(dayIndex, 'date', selectedDate);
+    }
+  };
+
+  const handleEventDayTimeChange = (dayIndex, timeType, event, selectedTime) => {
+    updateEventDay(dayIndex, `show${timeType}TimePicker`, false);
+    if (event.type === 'set' && selectedTime) {
+      updateEventDay(dayIndex, timeType === 'Start' ? 'startTime' : 'endTime', selectedTime);
+    }
+  };
+
+  // Add this function to render admin event days
+  const renderAdminEventDay = (day, index) => (
+    <View key={day.id} style={styles.eventDayContainer}>
+      <Text style={styles.dayTitle}>Day {index + 1}</Text>
+      
+      {/* Date Selection */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Date*</Text>
+        <TouchableOpacity
+          style={styles.dateInput}
+          onPress={() => updateEventDay(index, 'showDatePicker', true)}>
+          <Text>{formatDate(day.date)}</Text>
+          <Icon name="calendar" size={18} color="#666" />
+        </TouchableOpacity>
+        {day.showDatePicker && (
+          <DateTimePicker
+            value={day.date}
+            mode="date"
+            display="default"
+            onChange={(event, selectedDate) => handleEventDayDateChange(index, event, selectedDate)}
+            minimumDate={new Date()}
+          />
+        )}
+      </View>
+
+      {/* Time Selection */}
+      <View style={styles.timeContainer}>
+        <View style={styles.timeGroup}>
+          <Text style={styles.inputLabel}>Start Time*</Text>
+          <TouchableOpacity
+            style={styles.dateInput}
+            onPress={() => updateEventDay(index, 'showStartTimePicker', true)}>
+            <Text>{formatTime(day.startTime)}</Text>
+            <Icon name="clock-outline" size={18} color="#666" />
+          </TouchableOpacity>
+          {day.showStartTimePicker && (
+            <DateTimePicker
+              value={day.startTime}
+              mode="time"
+              display="default"
+              onChange={(event, selectedTime) => handleEventDayTimeChange(index, 'Start', event, selectedTime)}
+            />
+          )}
+        </View>
+
+        <View style={styles.timeGroup}>
+          <Text style={styles.inputLabel}>End Time*</Text>
+          <TouchableOpacity
+            style={styles.dateInput}
+            onPress={() => updateEventDay(index, 'showEndTimePicker', true)}>
+            <Text>{formatTime(day.endTime)}</Text>
+            <Icon name="clock-outline" size={18} color="#666" />
+          </TouchableOpacity>
+          {day.showEndTimePicker && (
+            <DateTimePicker
+              value={day.endTime}
+              mode="time"
+              display="default"
+              onChange={(event, selectedTime) => handleEventDayTimeChange(index, 'End', event, selectedTime)}
+            />
+          )}
+        </View>
+      </View>
+
+      {/* Venue for this day */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Venue (Day {index + 1})</Text>
+        <TextInput
+          style={styles.input}
+          placeholder={`Venue for day ${index + 1}`}
+          value={day.venue}
+          onChangeText={(text) => updateEventDay(index, 'venue', text)}
+        />
+      </View>
+
+      {/* Venue Address */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Venue Address</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Full address of the venue"
+          value={day.venueAddress}
+          onChangeText={(text) => updateEventDay(index, 'venueAddress', text)}
+        />
+      </View>
+
+      {/* Day Description */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Day Description</Text>
+        <TextInput
+          style={[styles.input, styles.textarea]}
+          placeholder={`What happens on day ${index + 1}?`}
+          value={day.description}
+          onChangeText={(text) => updateEventDay(index, 'description', text)}
+          multiline={true}
+          numberOfLines={3}
+        />
+      </View>
+
+      {/* Capacity for this day */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Capacity (Day {index + 1})</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Maximum attendees for this day"
+          value={day.capacity}
+          onChangeText={(text) => updateEventDay(index, 'capacity', text)}
+          keyboardType="number-pad"
+        />
+      </View>
+
+      {/* Special Notes */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Special Notes</Text>
+        <TextInput
+          style={[styles.input, styles.textarea]}
+          placeholder="Any special notes or instructions for this day"
+          value={day.specialNotes}
+          onChangeText={(text) => updateEventDay(index, 'specialNotes', text)}
+          multiline={true}
+          numberOfLines={3}
+        />
+      </View>
     </View>
   );
 
@@ -735,6 +990,40 @@ const AdminEditEventScreen = ({route, navigation}) => {
               </TouchableOpacity>
             </View>
           )}
+
+          {/* Date and Time Section - Updated for multi-day */}
+          <View style={styles.adminSection}>
+            <Text style={styles.sectionTitle}>
+              Event Schedule <Text style={styles.adminOnlyText}>(Admin Only)</Text>
+            </Text>
+            
+            {/* Number of Days Selection */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Number of Days*</Text>
+              <View style={styles.daysContainer}>
+                {[1, 2, 3, 4, 5, 6, 7].map((days) => (
+                  <TouchableOpacity
+                    key={days}
+                    style={[
+                      styles.dayButton,
+                      numberOfDays === days && styles.dayButtonSelected,
+                    ]}
+                    onPress={() => handleNumberOfDaysChange(days)}>
+                    <Text
+                      style={[
+                        styles.dayButtonText,
+                        numberOfDays === days && styles.dayButtonTextSelected,
+                      ]}>
+                      {days}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Event Days Section */}
+            {eventDays.map((day, index) => renderAdminEventDay(day, index))}
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -984,6 +1273,85 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 8,
   },
+
+  // Add these new styles for multi-day functionality
+  daysContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  dayButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#ddd',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    marginBottom: 8,
+    backgroundColor: 'white',
+  },
+  dayButtonSelected: {
+    borderColor: '#2e7af5',
+    backgroundColor: '#2e7af5',
+  },
+  dayButtonText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+  dayButtonTextSelected: {
+    color: 'white',
+  },
+  eventDayContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  dayTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2e7af5',
+    marginBottom: 16,
+    textAlign: 'center',
+    backgroundColor: '#f0f6ff',
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  timeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  timeGroup: {
+    width: '48%',
+  },
+  adminNoteContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#e3f2fd',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  adminNoteText: {
+    fontSize: 12,
+    color: '#1976d2',
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 16,
+  },
+
+  // ... rest of existing styles
 });
 
 export default AdminEditEventScreen;
