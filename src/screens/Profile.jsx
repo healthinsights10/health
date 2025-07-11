@@ -24,10 +24,10 @@ import {useFocusEffect} from '@react-navigation/native'; // ADD THIS IMPORT
 import fcmService from '../services/fcmService'; // Import fcmService
 
 // ADD THIS CONSTANT AT THE TOP
-const API_BASE_URL = 'https://health-server-bw3x.onrender.com/api';
+const API_BASE_URL = 'http://192.168.1.4:5000/api';
 
 const Profile = ({navigation}) => {
-  const {user, logout} = useAuth();
+  const {user, logout, setUser} = useAuth();
   const [userDocuments, setUserDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false); // ADD THIS STATE
@@ -36,7 +36,7 @@ const Profile = ({navigation}) => {
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const insets = useSafeAreaInsets();
 
-  // UPDATED: Fetch user profile with document and avatar
+  // Update the fetchUserProfile function to get fresh user data from server
   const fetchUserProfile = useCallback(
     async (showLoading = true) => {
       try {
@@ -47,11 +47,24 @@ const Profile = ({navigation}) => {
 
         if (showLoading) setLoading(true);
 
-        // Fetch updated user profile
+        // 🔥 IMPORTANT: Fetch fresh user profile data from server
         const userResponse = await userService.getUserProfile(user.id);
+        console.log('📄 Fresh user data from server:', userResponse.data);
 
-        if (userResponse && userResponse.avatar_url) {
-          setProfileImage(userResponse.avatar_url);
+        if (userResponse && userResponse.data) {
+          const freshUserData = userResponse.data;
+          
+          // 🔥 Update the user context with fresh data
+          if (freshUserData.verified !== user.verified) {
+            console.log('✅ User verification status updated:', freshUserData.verified);
+            // Update the user in AuthContext
+            setUser(freshUserData);
+            await AsyncStorage.setItem('@user', JSON.stringify(freshUserData));
+          }
+
+          if (freshUserData.avatar_url) {
+            setProfileImage(freshUserData.avatar_url);
+          }
         }
 
         // Fetch documents if user is a doctor
@@ -62,7 +75,6 @@ const Profile = ({navigation}) => {
         }
       } catch (error) {
         console.error('Failed to fetch user profile:', error);
-        // Don't show error alert on refresh, just log it
         if (showLoading) {
           Alert.alert(
             'Error',
@@ -218,7 +230,7 @@ const Profile = ({navigation}) => {
     }
   };
 
-  // ... renderDocumentViewer function remains the same ...
+  // Update the renderDocumentViewer function to remove verification status
   const renderDocumentViewer = () => {
     if (!viewingDocument) return null;
 
@@ -279,46 +291,6 @@ const Profile = ({navigation}) => {
                     onPress={() => Linking.openURL(viewingDocument.url)}>
                     <Text style={styles.pdfLink}>Open PDF</Text>
                   </TouchableOpacity>
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.documentStatus}>
-              <Text style={styles.documentStatusLabel}>Status:</Text>
-              <View
-                style={[
-                  styles.statusBadge,
-                  {
-                    backgroundColor: viewingDocument.verified
-                      ? '#e8f5e9'
-                      : '#fff3e0',
-                  },
-                ]}>
-                <Icon
-                  name={
-                    viewingDocument.verified ? 'check-circle' : 'clock-outline'
-                  }
-                  size={16}
-                  color={viewingDocument.verified ? '#2e7d32' : '#e65100'}
-                  style={{marginRight: 4}}
-                />
-                <Text
-                  style={[
-                    styles.statusText,
-                    {color: viewingDocument.verified ? '#2e7d32' : '#e65100'},
-                  ]}>
-                  {viewingDocument.verified
-                    ? 'Verified'
-                    : 'Pending Verification'}
-                </Text>
-              </View>
-            </View>
-
-            {viewingDocument.verificationNotes && (
-              <View style={styles.notesContainer}>
-                <Text style={styles.notesLabel}>Admin Notes:</Text>
-                <Text style={styles.notesText}>
-                  {viewingDocument.verificationNotes}
                 </Text>
               </View>
             )}
@@ -405,20 +377,58 @@ const Profile = ({navigation}) => {
             {user?.email || 'email@example.com'}
           </Text>
 
+          {/* Enhanced verification status for doctors */}
           {user?.role === 'doctor' && (
-            <View style={styles.verificationStatus}>
-              <Icon
-                name={user?.verified ? 'shield-check' : 'shield-alert'}
-                size={20}
-                color={user?.verified ? '#4caf50' : '#ff9800'}
-              />
-              <Text
+            <View style={styles.verificationContainer}>
+              <View
                 style={[
-                  styles.verificationText,
-                  {color: user?.verified ? '#4caf50' : '#ff9800'},
+                  styles.verificationBadge,
+                  user?.verified ? styles.verifiedBadge : styles.unverifiedBadge,
                 ]}>
-                {user?.verified ? 'Verified Doctor' : 'Verification Pending'}
-              </Text>
+                <Icon
+                  name={user?.verified ? 'shield-check' : 'shield-alert'}
+                  size={16}
+                  color={user?.verified ? '#4caf50' : '#ff9800'}
+                />
+                <Text
+                  style={[
+                    styles.verificationText,
+                    user?.verified ? styles.verifiedText : styles.unverifiedText,
+                  ]}>
+                  {user?.verified ? 'Verified Doctor' : 'Verification Pending'}
+                </Text>
+              </View>
+
+              {/* Show verification date if available */}
+              {user?.verified && user?.verified_at && (
+                <Text style={styles.verificationDate}>
+                  Verified on {new Date(user.verified_at).toLocaleDateString()}
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* Show verification status for pharma too */}
+          {user?.role === 'pharma' && (
+            <View style={styles.verificationContainer}>
+              <View
+                style={[
+                  styles.verificationBadge,
+                  user?.verified ? styles.verifiedBadge : styles.unverifiedBadge,
+                ]}>
+                <Icon
+                  name={user?.verified ? 'shield-check' : 'shield-alert'}
+                  size={16}
+                  color={user?.verified ? '#4caf50' : '#ff9800'}
+                />
+                <Text
+                  style={[
+                    styles.verificationText,
+                    user?.verified ? styles.verifiedText : styles.unverifiedText,
+                  ]}>
+                  {user?.verified ? 'Verified Representative' : 'Verification Pending'}
+                </Text>
+              </View>
             </View>
           )}
         </View>
@@ -482,7 +492,7 @@ const Profile = ({navigation}) => {
                 <>
                   {userDocuments.map((doc, index) => (
                     <TouchableOpacity
-                      key={`${doc.id || index}-${doc.name}`} // Better key for re-renders
+                      key={`${doc.id || index}-${doc.name}`}
                       style={styles.documentItem}
                       onPress={() => setViewingDocument(doc)}>
                       <Icon
@@ -503,21 +513,7 @@ const Profile = ({navigation}) => {
                             : 'Unknown date'}
                         </Text>
                       </View>
-                      <View
-                        style={[
-                          styles.documentBadge,
-                          {
-                            backgroundColor: doc.verified
-                              ? '#e8f5e9'
-                              : '#fff3e0',
-                          },
-                        ]}>
-                        <Icon
-                          name={doc.verified ? 'check-circle' : 'clock-outline'}
-                          size={12}
-                          color={doc.verified ? '#2e7d32' : '#e65100'}
-                        />
-                      </View>
+                      {/* REMOVED: Document verification badge */}
                     </TouchableOpacity>
                   ))}
                 </>
@@ -772,19 +768,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
-  verificationStatus: {
+  verificationContainer: {
+    alignItems: 'center',
+    marginTop: 8,
+    width: '100%',
+  },
+  verificationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 16,
-    marginTop: 8,
+  },
+  verifiedBadge: {
+    backgroundColor: '#e8f5e9',
+  },
+  unverifiedBadge: {
+    backgroundColor: '#fff3e0',
   },
   verificationText: {
     marginLeft: 6,
     fontSize: 14,
     fontWeight: '500',
+  },
+  verifiedText: {
+    color: '#2e7d32',
+  },
+  unverifiedText: {
+    color: '#e65100',
   },
   documentItem: {
     flexDirection: 'row',

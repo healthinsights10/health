@@ -238,7 +238,7 @@ const ConferencesScreen = ({navigation}) => {
     }
   }, []);
 
-  // Optimized filtering with useMemo
+  // Optimized filtering with useMemo - FIXED for multi-day events
   const filteredEvents = useMemo(() => {
     return events.filter(event => {
       // Filter based on active tab
@@ -263,17 +263,35 @@ const ConferencesScreen = ({navigation}) => {
         }
       }
 
-      // Filter based on selected date
+      // Filter based on selected date - FIXED for multi-day events
       if (selectedDate) {
-        const eventStartDate = new Date(event.start_date);
         const searchDate = new Date(selectedDate);
+        searchDate.setHours(0, 0, 0, 0);
+        
+        // Check if event has eventDays (multi-day event)
+        if (event.eventDays && event.eventDays.length > 0) {
+          // For multi-day events, check if selected date falls within any event day
+          const isDateInEventDays = event.eventDays.some(day => {
+            const dayDate = new Date(day.date);
+            dayDate.setHours(0, 0, 0, 0);
+            return dayDate.getTime() === searchDate.getTime();
+          });
+          
+          if (!isDateInEventDays) {
+            return false;
+          }
+        } else {
+          // For single-day events, check if selected date falls within start_date and end_date
+          const eventStartDate = new Date(event.start_date);
+          eventStartDate.setHours(0, 0, 0, 0);
+          const eventEndDate = new Date(event.end_date);
+          eventEndDate.setHours(0, 0, 0, 0);
 
-        if (
-          eventStartDate.getDate() !== searchDate.getDate() ||
-          eventStartDate.getMonth() !== searchDate.getMonth() ||
-          eventStartDate.getFullYear() !== searchDate.getFullYear()
-        ) {
-          return false;
+          // Check if selected date is within the event's date range
+          if (searchDate.getTime() < eventStartDate.getTime() || 
+              searchDate.getTime() > eventEndDate.getTime()) {
+            return false;
+          }
         }
       }
 
@@ -432,7 +450,7 @@ const ConferencesScreen = ({navigation}) => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTitleContainer}>
-          <View>
+          <View style={styles.headerLeftContent}>
             <Text style={styles.headerTitle}>Events</Text>
             <Text style={styles.headerSubtitle}>
               Browse and Register For Upcoming Events.
@@ -625,6 +643,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     width: '100%',
   },
+  headerLeftContent: {
+    flex: 1,
+    paddingRight: 12, // Add spacing between title and button
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -641,13 +663,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#2e7af5',
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 12, // Reduced padding
+    paddingVertical: 8,    // Reduced padding
+    minWidth: 80,          // Ensure minimum width
+    justifyContent: 'center',
   },
   createButtonText: {
     color: 'white',
     fontWeight: '500',
-    marginLeft: 6,
+    marginLeft: 4,        // Reduced margin
+    fontSize: 14,         // Slightly smaller font
   },
   searchContainer: {
     flexDirection: 'row',

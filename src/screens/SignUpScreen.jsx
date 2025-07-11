@@ -21,7 +21,7 @@ import {api} from '../services/api';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 // Use the same API URL as the auth service
-const API_BASE_URL = 'https://health-server-bw3x.onrender.com/api';
+const API_BASE_URL = 'http://192.168.1.4:5000/api';
 
 const SignUpScreen = ({navigation}) => {
   const [step, setStep] = useState(1);
@@ -256,12 +256,18 @@ const SignUpScreen = ({navigation}) => {
 
             formData.append('document', {
               uri:
-                Platform.OS === 'ios' ? doc.uri.replace('file://', '') : doc.uri,
+                Platform.OS === 'ios'
+                  ? doc.uri.replace('file://', '')
+                  : doc.uri,
               type: doc.type || 'application/octet-stream',
-              name: doc.name || `file-${Date.now()}.${doc.uri.split('.').pop()}`,
+              name:
+                doc.name || `file-${Date.now()}.${doc.uri.split('.').pop()}`,
             });
 
-            console.log('Uploading document to:', `${API_BASE_URL}/uploads/temp-document`);
+            console.log(
+              'Uploading document to:',
+              `${API_BASE_URL}/uploads/temp-document`,
+            );
 
             const response = await fetch(
               `${API_BASE_URL}/uploads/temp-document`,
@@ -330,7 +336,7 @@ const SignUpScreen = ({navigation}) => {
       // IMPORTANT: Navigation should happen immediately after successful response
       if (response && response.needsOTPVerification === true) {
         console.log('✅ Navigating to OTP verification...');
-        
+
         // Use replace instead of navigate to prevent back navigation issues
         navigation.replace('OTPVerification', {
           email: email,
@@ -351,18 +357,21 @@ const SignUpScreen = ({navigation}) => {
       }
     } catch (error) {
       console.error('Signup error:', error);
-      
+
       // Provide more specific error messages
       let errorMessage = 'Please try again later';
-      
+
       if (error.message.includes('Network request failed')) {
-        errorMessage = 'Network connection failed. Please check your internet connection and server status.';
+        errorMessage =
+          'Network connection failed. Please check your internet connection and server status.';
       } else if (error.message.includes('timeout')) {
-        errorMessage = 'Request timed out. Please check your internet connection and try again.';
+        errorMessage =
+          'Request timed out. Please check your internet connection and try again.';
       } else if (error.message.includes('Document upload failed')) {
         errorMessage = error.message;
       } else if (error.response?.status === 400) {
-        errorMessage = error.response?.data?.message || 'Invalid user data provided';
+        errorMessage =
+          error.response?.data?.message || 'Invalid user data provided';
       } else if (error.response?.status === 409) {
         errorMessage = 'An account with this email already exists';
       } else if (error.response?.status === 500) {
@@ -370,7 +379,7 @@ const SignUpScreen = ({navigation}) => {
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       Alert.alert('Signup Failed', errorMessage);
     } finally {
       setIsSubmitting(false); // Use local loading state
@@ -620,10 +629,12 @@ const SignUpScreen = ({navigation}) => {
           <TextInput
             style={styles.passwordInput}
             placeholder="Create a password"
+            placeholderTextColor="grey" // Grey color for placeholder
             secureTextEntry={!showPassword}
             value={password}
             onChangeText={setPassword}
           />
+
           <TouchableOpacity
             style={styles.eyeButton}
             onPress={() => setShowPassword(!showPassword)}>
@@ -640,6 +651,7 @@ const SignUpScreen = ({navigation}) => {
           <TextInput
             style={styles.passwordInput}
             placeholder="Confirm your password"
+            placeholderTextColor="grey"
             secureTextEntry={!showConfirmPassword}
             value={confirmPassword}
             onChangeText={setConfirmPassword}
@@ -888,6 +900,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   passwordInput: {
+    color: "black",
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 16,

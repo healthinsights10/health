@@ -194,7 +194,7 @@ const HomeScreen = ({navigation}) => {
     }
   }, []);
 
-  // Fast initial fetch with minimal data
+  // Fast initial fetch with minimal data - UPDATED
   const fetchEventsQuick = useCallback(async () => {
     try {
       setLoading(true);
@@ -205,16 +205,8 @@ const HomeScreen = ({navigation}) => {
           data = await eventService.getMyEvents();
           break;
         case 'ongoing':
+          // Backend now returns only ongoing & registered events for today
           data = await eventService.getOngoingEvents();
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          data = data.filter(event => {
-            const startDate = new Date(event.startDate);
-            startDate.setHours(0, 0, 0, 0);
-            const endDate = new Date(event.endDate);
-            endDate.setHours(23, 59, 59, 999);
-            return startDate <= today && endDate >= today;
-          });
           break;
         case 'participated':
           data = await eventService.getRegisteredEvents();
@@ -224,7 +216,6 @@ const HomeScreen = ({navigation}) => {
           data = await eventService.getMyEvents();
       }
 
-      // Set events immediately without brochures for fast initial render
       setEvents(data);
       setLoading(false);
 
@@ -265,7 +256,7 @@ const HomeScreen = ({navigation}) => {
     }
   }, [activeTab]);
 
-  // Background fetch for remaining data
+  // Background fetch for remaining data - UPDATED
   const fetchAllEventsDataBackground = useCallback(async () => {
     try {
       const [myEventsData, ongoingEventsData, registeredEventsData] =
@@ -275,9 +266,26 @@ const HomeScreen = ({navigation}) => {
           eventService.getRegisteredEvents(),
         ]);
 
+      // Filter ongoing events to only show registered ones
+      const registeredEventIds = registeredEventsData.map(event => event.id);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const filteredOngoingEvents = ongoingEventsData.filter(event => {
+        const startDate = new Date(event.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(event.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        
+        const isOngoing = startDate <= today && endDate >= today;
+        const isRegistered = registeredEventIds.includes(event.id);
+        
+        return isOngoing && isRegistered;
+      });
+
       setAllEventsData({
         myEvents: myEventsData,
-        ongoingEvents: ongoingEventsData,
+        ongoingEvents: filteredOngoingEvents, // Updated to only registered ongoing events
         registeredEvents: registeredEventsData,
       });
     } catch (error) {
@@ -377,9 +385,11 @@ const HomeScreen = ({navigation}) => {
             {new Date(item.startDate).toLocaleDateString('en-US', {
               month: 'short',
               day: 'numeric',
+              year: 'numeric', // Add year
             })} - {new Date(item.endDate).toLocaleDateString('en-US', {
               month: 'short',
               day: 'numeric',
+              year: 'numeric', // Add year
             })}
           </Text>
         </View>
@@ -498,6 +508,24 @@ const HomeScreen = ({navigation}) => {
     ]);
   }, [fetchEventsQuick, fetchRegisteredEvents, fetchAllEventsDataBackground]);
 
+  // Update the empty state message for ongoing events
+  const getEmptyStateMessage = () => {
+    if (searchTerm !== '') {
+      return 'No events match your search criteria.';
+    }
+    
+    switch (activeTab) {
+      case 'my':
+        return 'Create your first medical event';
+      case 'ongoing':
+        return 'No ongoing events that you are registered for';
+      case 'participated':
+        return "You haven't registered for any events yet";
+      default:
+        return 'No events found';
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.container, {paddingTop: insets.top}]}>
       <StatusBar barStyle="dark-content" backgroundColor="white" />
@@ -591,7 +619,7 @@ const HomeScreen = ({navigation}) => {
             <Icon name="magnify" size={18} color="#666" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder={`Search ${activeTab} events...`}
+              placeholder={`Search ${activeTab === 'ongoing' ? 'ongoing' : activeTab} events...`}
               value={searchTerm}
               onChangeText={setSearchTerm}
               placeholderTextColor="#999"
@@ -621,19 +649,20 @@ const HomeScreen = ({navigation}) => {
               <Icon name="calendar-blank" size={64} color="#ccc" />
               <Text style={styles.emptyTitle}>No Events Found</Text>
               <Text style={styles.emptySubtitle}>
-                {searchTerm !== '' 
-                  ? 'No events match your search criteria.'
-                  : activeTab === 'my'
-                  ? 'Create your first medical event'
-                  : activeTab === 'ongoing'
-                  ? 'No ongoing events at the moment'
-                  : "You haven't registered for any events yet"}
+                {getEmptyStateMessage()}
               </Text>
               {activeTab === 'my' && searchTerm === '' && (
                 <TouchableOpacity
                   style={styles.createEventButton}
                   onPress={() => navigation.navigate('CreateConference')}>
                   <Text style={styles.createEventButtonText}>Create Event</Text>
+                </TouchableOpacity>
+              )}
+              {activeTab === 'ongoing' && searchTerm === '' && (
+                <TouchableOpacity
+                  style={styles.createEventButton}
+                  onPress={() => navigation.navigate('Conferences')}>
+                  <Text style={styles.createEventButtonText}>Browse Events</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -711,7 +740,7 @@ const HomeScreen = ({navigation}) => {
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, {backgroundColor: '#4CAF50'}]} />
-                <Text style={styles.legendText}>Ongoing Events</Text>
+                <Text style={styles.legendText}>My Ongoing</Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, {backgroundColor: '#FF9800'}]} />

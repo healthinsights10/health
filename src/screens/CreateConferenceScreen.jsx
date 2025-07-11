@@ -264,9 +264,9 @@ const handleTimeChange = (dayIndex, timeType, event, selectedTime) => {
   };
 
   const handleCreateConference = async () => {
-    // Validate basic fields
-    if (!title || !description) {
-      Alert.alert('Missing Information', 'Please fill all required fields.');
+    // Validate basic fields - UPDATED: Only title is required
+    if (!title) {
+      Alert.alert('Missing Information', 'Please enter an event title.');
       return;
     }
 
@@ -331,7 +331,7 @@ const handleTimeChange = (dayIndex, timeType, event, selectedTime) => {
     // Create event object
     const newEvent = {
       title,
-      description,
+      description: description || '', // Allow empty description
       venue: venue || eventDays[0]?.venue || '',
       organizerName,
       organizerEmail,
@@ -590,7 +590,7 @@ const handleTimeChange = (dayIndex, timeType, event, selectedTime) => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Description*</Text>
+            <Text style={styles.inputLabel}>Description</Text>
             <TextInput
               style={[styles.input, styles.textarea]}
               placeholder="Describe the purpose and topics of your event"

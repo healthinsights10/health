@@ -4,7 +4,7 @@ import {authService} from '../services/api';
 import {fcmService} from '../services/fcmService';
 
 // Add this line to define the API URL
-const API_URL = 'https://health-server-bw3x.onrender.com';
+const API_URL = 'http://192.168.1.4:5000';
 
 export const AuthContext = createContext();
 
@@ -228,6 +228,27 @@ export const AuthProvider = ({children}) => {
     }
   };
 
+  // Add this method to refresh user data
+  const refreshUserData = async () => {
+    try {
+      const token = await AsyncStorage.getItem('@token');
+      if (token && user) {
+        // Get fresh user data from server
+        const response = await authService.getUserProfile(user.id);
+        if (response && response.data) {
+          const freshUserData = response.data;
+          setUser(freshUserData);
+          await AsyncStorage.setItem('@user', JSON.stringify(freshUserData));
+          console.log('✅ User data refreshed in AuthContext');
+          return freshUserData;
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing user data:', error);
+    }
+  };
+
+  // Make sure to export this function
   return (
     <AuthContext.Provider
       value={{
@@ -240,7 +261,9 @@ export const AuthProvider = ({children}) => {
         getToken,
         resendVerification,
         verifyOTP,
-        isAuthenticated: !!user, // This is computed from user state
+        refreshUserData, // 🔥 Add this
+        setUser, // 🔥 Add this for Profile screen
+        isAuthenticated: !!user,
       }}>
       {children}
     </AuthContext.Provider>
