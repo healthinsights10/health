@@ -52,6 +52,7 @@ import FCMDebugScreen from '../screens/FCMDebugScreen';
 import QuizScreen from '../screens/QuizScreen';
 import AdminQuizScreen from '../screens/admin/AdminQuizScreen';
 import PendingCoursesScreen from '../screens/admin/PendingCoursesScreen';
+import NotificationScreen from '../screens/NotificationScreen';
 
 const Stack = createStackNavigator();
 const AdminStack = createStackNavigator();
@@ -293,6 +294,11 @@ const AppNavigator = () => {
               options={{
                 headerShown: false,
               }}
+            />
+            <Stack.Screen 
+              name="NotificationScreen" 
+              component={NotificationScreen} 
+              options={{ headerShown: false }} 
             />
             
           </>

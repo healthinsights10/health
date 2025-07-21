@@ -2,7 +2,7 @@ import messaging from '@react-native-firebase/messaging';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Platform, Alert, Linking} from 'react-native';
 
-const API_URL = 'http://192.168.1.4:5000/api';
+const API_URL = 'http://192.168.1.3:5000/api';
 
 class FCMService {
   async registerAppWithFCM() {

@@ -24,7 +24,7 @@ import {useFocusEffect} from '@react-navigation/native'; // ADD THIS IMPORT
 import fcmService from '../services/fcmService'; // Import fcmService
 
 // ADD THIS CONSTANT AT THE TOP
-const API_BASE_URL = 'http://192.168.1.4:5000/api';
+const API_BASE_URL = 'http://192.168.1.3:5000/api';
 
 const Profile = ({navigation}) => {
   const {user, logout, setUser} = useAuth();
@@ -180,8 +180,15 @@ const Profile = ({navigation}) => {
 
       const result = await response.json();
 
-      // INSTANT UPDATE: Update profile image state immediately
+       // INSTANT UPDATE: Update profile image state immediately
       setProfileImage(result.avatar_url);
+
+      // 🔥 FIX: Update user context and AsyncStorage with new avatar_url
+      setUser(prev => {
+        const updated = {...prev, avatar_url: result.avatar_url};
+        AsyncStorage.setItem('@user', JSON.stringify(updated));
+        return updated;
+      });
 
       // Show success message
       Alert.alert('Success', 'Profile picture updated successfully');
@@ -309,16 +316,11 @@ const Profile = ({navigation}) => {
           <Icon name="arrow-left" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Profile</Text>
-        {/* ADD: Refresh button in header */}
+        {/* UPDATED: Replace refresh button with bell icon */}
         <TouchableOpacity
-          onPress={onRefresh}
-          style={styles.refreshButton}
-          disabled={refreshing}>
-          <Icon
-            name={refreshing ? 'loading' : 'refresh'}
-            size={20}
-            color={refreshing ? '#ccc' : '#2e7af5'}
-          />
+          onPress={() => navigation.navigate('NotificationScreen')}
+          style={styles.notificationButton}>
+          <Icon name="bell" size={24} color="#2e7af5" />
         </TouchableOpacity>
       </View>
 
@@ -975,6 +977,11 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   refreshButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+  },
+  notificationButton: {
     padding: 8,
     borderRadius: 20,
     backgroundColor: '#f0f0f0',

@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Base URL for API calls
-const API_URL = 'http://192.168.1.4:5000/api';
+const API_URL = 'http://192.168.1.3:5000/api';
 
 // Create axios instance with better configuration
 const api = axios.create({
@@ -1349,6 +1349,61 @@ export const quizService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching quiz results:', error);
+      throw error;
+    }
+  },
+};
+
+// Update the notificationService object:
+export const notificationService = {
+  // Get user notifications
+  getNotifications: async () => {
+    try {
+      console.log('📱 Frontend: Requesting notifications from /events/notifications');
+      const response = await api.get('/events/notifications');
+      console.log('📱 Frontend: Received notifications response:', response.data?.length || 0);
+      return response.data;
+    } catch (error) {
+      console.error('📱 Frontend: Get notifications error:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        url: error.config?.url
+      });
+      throw error;
+    }
+  },
+
+  // Mark notification as read
+  markAsRead: async (notificationId) => {
+    try {
+      console.log('📱 Frontend: Marking notification as read:', notificationId);
+      const response = await api.put(`/events/notifications/${notificationId}/read`);
+      console.log('📱 Frontend: Mark as read response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('📱 Frontend: Mark notification as read error:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      throw error;
+    }
+  },
+
+  // Mark all notifications as read
+  markAllAsRead: async () => {
+    try {
+      console.log('📱 Frontend: Marking all notifications as read');
+      const response = await api.put('/events/notifications/mark-all-read');
+      console.log('📱 Frontend: Mark all as read response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('📱 Frontend: Mark all notifications as read error:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
       throw error;
     }
   },
