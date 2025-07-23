@@ -584,7 +584,7 @@ const Profile = ({navigation}) => {
                 style={styles.menuItem}
                 onPress={() => navigation.navigate('MeetingInvitations')}>
                 <Icon name="calendar-clock" size={24} color="#2e7af5" />
-                <Text style={styles.menuText}>My Meeting Invitations</Text>
+                <Text style={styles.menuText}>Private Meetings</Text>
                 <Icon name="chevron-right" size={24} color="#ccc" />
               </TouchableOpacity>
             </View>
@@ -630,30 +630,15 @@ const Profile = ({navigation}) => {
             <Icon name="chevron-right" size={24} color="#ccc" />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={requestNotificationPermission}>
-            <Icon name="bell-ring" size={24} color="#2e7af5" />
-            <Text style={styles.menuText}>Enable Notifications</Text>
-            <Icon name="chevron-right" size={24} color="#ccc" />
-          </TouchableOpacity>
-
           <TouchableOpacity style={styles.menuItem}>
             <Icon name="shield-account" size={24} color="#2e7af5" />
             <Text style={styles.menuText}>Privacy & Security</Text>
             <Icon name="chevron-right" size={24} color="#ccc" />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => navigation.navigate('FCMDebug')}>
-            <Icon name="bell-ring" size={24} color="#2e7af5" />
-            <Text style={styles.menuText}>Debug Notifications</Text>
-            <Icon name="chevron-right" size={24} color="#ccc" />
-          </TouchableOpacity>
         </View>
 
-        <View style={styles.sectionContainer}>
+        {/* <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Support</Text>
 
           <TouchableOpacity style={styles.menuItem}>
@@ -667,7 +652,7 @@ const Profile = ({navigation}) => {
             <Text style={styles.menuText}>About</Text>
             <Icon name="chevron-right" size={24} color="#ccc" />
           </TouchableOpacity>
-        </View>
+        </View> */}
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Icon name="logout" size={24} color="#fff" />

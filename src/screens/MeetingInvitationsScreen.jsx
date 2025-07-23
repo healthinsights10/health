@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {useAuth} from '../context/AuthContext';
-import {meetingService} from '../services/api';
+import { userService } from '../services/api';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 const MeetingInvitationsScreen = ({navigation}) => {
@@ -19,10 +19,10 @@ const MeetingInvitationsScreen = ({navigation}) => {
   const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
   const insets = useSafeAreaInsets();
+
   useEffect(() => {
     fetchInvitations();
 
-    // Add listener for when screen comes into focus
     const unsubscribe = navigation.addListener('focus', () => {
       fetchInvitations();
     });
@@ -33,20 +33,27 @@ const MeetingInvitationsScreen = ({navigation}) => {
   const fetchInvitations = async () => {
     try {
       setLoading(true);
-      let response;
+      let organized = [];
+      let invited = [];
 
-      // Use the proper method based on user role
+      // Fetch meetings organized by the doctor
       if (user?.role === 'doctor') {
-        response = await meetingService.getInvitedMeetings();
+        organized = await userService.getOrganizedMeetings();
+        invited = await userService.getInvitedMeetings();
       } else if (user?.role === 'pharma') {
-        response = await meetingService.getOrganizedMeetings();
+        organized = await userService.getOrganizedMeetings();
       } else if (user?.role === 'admin') {
-        response = await meetingService.getAllMeetings();
-      } else {
-        throw new Error('Unauthorized user role');
+        organized = await userService.getAllMeetings();
       }
 
-      setInvitations(response);
+      // Merge and deduplicate by meeting id
+      const allMeetings = [...organized, ...invited];
+      const uniqueMeetings = allMeetings.filter(
+        (meeting, index, self) =>
+          index === self.findIndex(m => m.id === meeting.id)
+      );
+
+      setInvitations(uniqueMeetings);
     } catch (error) {
       console.error('Failed to fetch meeting invitations:', error);
       Alert.alert('Error', 'Failed to load invitations. Please try again.');
@@ -61,7 +68,7 @@ const MeetingInvitationsScreen = ({navigation}) => {
 
   const handleAcceptInvitation = async meetingId => {
     try {
-      await meetingService.updateInvitationStatus(meetingId, 'accepted');
+      await userService.updateInvitationStatus(meetingId, 'accepted');
       Alert.alert('Success', 'You have accepted the meeting invitation.');
       fetchInvitations(); // Refresh the invitations list
     } catch (error) {
@@ -72,7 +79,7 @@ const MeetingInvitationsScreen = ({navigation}) => {
 
   const handleDeclineInvitation = async meetingId => {
     try {
-      await meetingService.updateInvitationStatus(meetingId, 'declined');
+      await userService.updateInvitationStatus(meetingId, 'declined');
       Alert.alert('Success', 'You have declined the meeting invitation.');
       fetchInvitations(); // Refresh the invitations list
     } catch (error) {
