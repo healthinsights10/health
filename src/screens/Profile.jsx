@@ -22,6 +22,9 @@ import * as ImagePicker from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useFocusEffect} from '@react-navigation/native'; // ADD THIS IMPORT
 import fcmService from '../services/fcmService'; // Import fcmService
+// ADD this import at the top with other service imports
+import {  notificationService } from '../services/api';
+//import notificationService from '../services/notificationService'; // Import notificationService
 
 // ADD THIS CONSTANT AT THE TOP
 const API_BASE_URL = 'http://192.168.1.3:5000/api';
@@ -34,16 +37,34 @@ const Profile = ({navigation}) => {
   const [viewingDocument, setViewingDocument] = useState(null);
   const [profileImage, setProfileImage] = useState(user?.avatar_url || null);
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
+  
+  // ADD: State for unread notifications count
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  
   const insets = useSafeAreaInsets();
 
-  // Update the fetchUserProfile function to get fresh user data from server
+  // ADD: Function to fetch unread notifications count
+  const fetchUnreadNotificationsCount = useCallback(async () => {
+    try {
+      setLoadingNotifications(true);
+      const notifications = await notificationService.getNotifications();
+      const unreadNotifications = notifications.filter(notif => !notif.read);
+      setUnreadCount(unreadNotifications.length - 1);
+      console.log('📱 Profile: Unread notifications count:', unreadNotifications.length);
+    } catch (error) {
+      console.error('Failed to fetch notifications count:', error);
+      setUnreadCount(0);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  }, []);
+
+  // Update the fetchUserProfile function to also fetch notifications
   const fetchUserProfile = useCallback(
     async (showLoading = true) => {
       try {
-        if (!user) {
-          console.log('User data not available yet');
-          return;
-        }
+        if (!user) return;
 
         if (showLoading) setLoading(true);
 
@@ -53,55 +74,63 @@ const Profile = ({navigation}) => {
 
         if (userResponse && userResponse.data) {
           const freshUserData = userResponse.data;
-          
-          // 🔥 Update the user context with fresh data
-          if (freshUserData.verified !== user.verified) {
-            console.log('✅ User verification status updated:', freshUserData.verified);
-            // Update the user in AuthContext
-            setUser(freshUserData);
-            await AsyncStorage.setItem('@user', JSON.stringify(freshUserData));
-          }
+          setUser(prev => ({
+            ...prev,
+            ...freshUserData,
+          }));
 
+          // Update profile image if it exists
           if (freshUserData.avatar_url) {
             setProfileImage(freshUserData.avatar_url);
           }
+
+          // Store fresh user data in AsyncStorage
+          await AsyncStorage.setItem('@user', JSON.stringify(freshUserData));
         }
 
         // Fetch documents if user is a doctor
         if (user?.role === 'doctor') {
-          const docResponse = await userService.getMyDocuments();
-          console.log('📄 Documents fetched:', docResponse?.length || 0);
-          setUserDocuments(docResponse || []);
+          try {
+            const documentsResponse = await userService.getMyDocuments();
+            setUserDocuments(documentsResponse || []);
+          } catch (docError) {
+            console.error('Failed to fetch documents:', docError);
+            setUserDocuments([]);
+          }
         }
+
+        // ADD: Fetch notifications count
+        await fetchUnreadNotificationsCount();
       } catch (error) {
         console.error('Failed to fetch user profile:', error);
         if (showLoading) {
-          Alert.alert(
-            'Error',
-            'Failed to fetch profile data. Please try again.',
-          );
+          Alert.alert('Error', 'Failed to load profile data. Please try again.');
         }
       } finally {
         if (showLoading) setLoading(false);
         setRefreshing(false);
       }
     },
-    [user],
+    [user, fetchUnreadNotificationsCount],
+  );
+
+  // ADD: Update notifications count when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      console.log('📱 Profile screen focused, refreshing data...');
+      fetchUserProfile();
+      fetchUnreadNotificationsCount(); // Also fetch notifications when returning to screen
+    }, [fetchUserProfile, fetchUnreadNotificationsCount]),
   );
 
   // ADD: Pull-to-refresh handler
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchUserProfile(false); // false = don't show loading spinner
-  }, [fetchUserProfile]);
-
-  // UPDATED: Use useFocusEffect for auto-refresh when screen is focused
-  useFocusEffect(
-    useCallback(() => {
-      console.log('📱 Profile screen focused, refreshing data...');
-      fetchUserProfile();
-    }, [fetchUserProfile]),
-  );
+    await Promise.all([
+      fetchUserProfile(false), // false = don't show loading spinner
+      fetchUnreadNotificationsCount()
+    ]);
+  }, [fetchUserProfile, fetchUnreadNotificationsCount]);
 
   // Keep the original useEffect as fallback
   useEffect(() => {
@@ -316,11 +345,21 @@ const Profile = ({navigation}) => {
           <Icon name="arrow-left" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Profile</Text>
-        {/* UPDATED: Replace refresh button with bell icon */}
+        
+        {/* UPDATED: Add notification badge to bell icon */}
         <TouchableOpacity
           onPress={() => navigation.navigate('NotificationScreen')}
           style={styles.notificationButton}>
-          <Icon name="bell" size={24} color="#2e7af5" />
+          <View style={styles.notificationIconContainer}>
+            <Icon name="bell" size={24} color="#2e7af5" />
+            {unreadCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            )}
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -985,6 +1024,32 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     backgroundColor: '#f0f0f0',
+  },
+  
+  // ADD: New styles for notification badge
+  notificationIconContainer: {
+    position: 'relative',
+  },
+  
+  notificationBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#ff4757',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });
 

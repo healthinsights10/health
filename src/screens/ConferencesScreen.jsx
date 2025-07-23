@@ -241,57 +241,45 @@ const ConferencesScreen = ({navigation}) => {
   // Optimized filtering with useMemo - FIXED for multi-day events
   const filteredEvents = useMemo(() => {
     return events.filter(event => {
-      // Filter based on active tab
-      if (activeTab === 'Conferences' && event.type !== 'Conference') {
-        return false;
-      }
+      // Filter by tab
+      if (activeTab === 'Conferences' && event.type !== 'Conference') return false;
+      if (activeTab === 'Meetings' && event.type !== 'Meeting') return false;
 
-      if (activeTab === 'Meetings' && event.type !== 'Meeting') {
-        return false;
-      }
-
-      // Filter based on search query
+      // Filter by search
       if (searchQuery) {
         const searchTerm = searchQuery.toLowerCase();
         const matchesSearch =
           event.title.toLowerCase().includes(searchTerm) ||
           event.description.toLowerCase().includes(searchTerm) ||
           event.organizer_name.toLowerCase().includes(searchTerm);
-
-        if (!matchesSearch) {
-          return false;
-        }
+        if (!matchesSearch) return false;
       }
 
-      // Filter based on selected date - FIXED for multi-day events
+      // Filter by selected date
       if (selectedDate) {
         const searchDate = new Date(selectedDate);
         searchDate.setHours(0, 0, 0, 0);
-        
-        // Check if event has eventDays (multi-day event)
+
+        // If eventDays exist and not empty, check if any day matches
         if (event.eventDays && event.eventDays.length > 0) {
-          // For multi-day events, check if selected date falls within any event day
           const isDateInEventDays = event.eventDays.some(day => {
             const dayDate = new Date(day.date);
             dayDate.setHours(0, 0, 0, 0);
             return dayDate.getTime() === searchDate.getTime();
           });
-          
-          if (!isDateInEventDays) {
-            return false;
-          }
-        } else {
-          // For single-day events, check if selected date falls within start_date and end_date
-          const eventStartDate = new Date(event.start_date);
-          eventStartDate.setHours(0, 0, 0, 0);
-          const eventEndDate = new Date(event.end_date);
-          eventEndDate.setHours(0, 0, 0, 0);
+          if (isDateInEventDays) return true;
+          // If not found in eventDays, still check the range as fallback
+        }
 
-          // Check if selected date is within the event's date range
-          if (searchDate.getTime() < eventStartDate.getTime() || 
-              searchDate.getTime() > eventEndDate.getTime()) {
-            return false;
-          }
+        // Fallback: check if selectedDate is within start_date and end_date (inclusive)
+        const eventStartDate = new Date(event.start_date);
+        eventStartDate.setHours(0, 0, 0, 0);
+        const eventEndDate = new Date(event.end_date);
+        eventEndDate.setHours(0, 0, 0, 0);
+
+        if (searchDate.getTime() < eventStartDate.getTime() ||
+            searchDate.getTime() > eventEndDate.getTime()) {
+          return false;
         }
       }
 

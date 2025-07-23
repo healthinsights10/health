@@ -32,7 +32,18 @@ const NotificationScreen = ({ navigation }) => {
       const data = await notificationService.getNotifications();
       console.log('📱 Received notifications:', data?.length || 0);
       
-      setNotifications(data || []);
+      // Remove duplicates based on title, body, and data.id
+      const uniqueNotifications = data?.filter((notification, index, self) => {
+        return index === self.findIndex(n => 
+          n.title === notification.title && 
+          n.body === notification.body && 
+          n.data?.id === notification.data?.id
+        );
+      }) || [];
+
+      console.log('📱 After deduplication:', uniqueNotifications.length);
+      
+      setNotifications(uniqueNotifications);
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
       Alert.alert('Error', 'Failed to load notifications. Please try again.');
