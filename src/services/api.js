@@ -613,6 +613,28 @@ export const eventService = {
   //   }
   // },
 
+  getAvailableUsers: async () => {
+    try {
+      console.log('📱 Frontend: Requesting available users');
+      const response = await api.get('/users/available');
+      console.log('📱 Frontend: Response received:', {
+        status: response.status,
+        dataLength: response.data?.length || 0
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('📱 Frontend: Get available users error:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url
+      });
+      throw error;
+    }
+  },
+
   updateEvent: async (eventId, eventData) => {
     try {
       console.log(

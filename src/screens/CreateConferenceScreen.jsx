@@ -17,7 +17,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {useAuth} from '../context/AuthContext';
-import {eventService} from '../services/api';
+import {eventService, userService} from '../services/api';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Picker} from '@react-native-picker/picker';
 import CheckBox from '@react-native-community/checkbox';
@@ -78,6 +78,15 @@ const CreateConferenceScreen = ({navigation}) => {
   const [sponsorSearchQuery, setSponsorSearchQuery] = useState('');
   const [filteredPharmaCompanies, setFilteredPharmaCompanies] = useState([]);
   const [showSponsorDropdown, setShowSponsorDropdown] = useState(false);
+
+  // Private event states
+  const [isPrivateEvent, setIsPrivateEvent] = useState(false);
+  const [invitedMembers, setInvitedMembers] = useState([]);
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
+  const [showMemberDropdown, setShowMemberDropdown] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   // Handle number of days change
   const handleNumberOfDaysChange = (days) => {
@@ -263,6 +272,77 @@ const handleTimeChange = (dayIndex, timeType, event, selectedTime) => {
     setSelectedPharmaIds(selectedPharmaIds.filter(id => id !== pharmaId));
   };
 
+  // Fetch users when private event is toggled
+  useEffect(() => {
+    if (isPrivateEvent) fetchAvailableUsers();
+  }, [isPrivateEvent]);
+
+  // Update the fetchAvailableUsers function
+const fetchAvailableUsers = async () => {
+  setLoadingUsers(true);
+  try {
+    console.log('📱 CreateConference: Fetching available users for private event invitations');
+    console.log('📱 CreateConference: User context:', { id: user?.id, role: user?.role });
+    
+    // Use eventService instead of direct api call
+    const response = await eventService.getAvailableUsers();
+    console.log('📱 CreateConference: Available users response:', {
+      count: response?.length || 0,
+      users: response?.map(u => ({ id: u.id, name: u.name, email: u.email }))
+    });
+    
+    setAvailableUsers(response || []);
+  } catch (error) {
+    console.error('❌ CreateConference: Failed to fetch available users:', error);
+    
+    let errorMessage = 'Failed to load available users. ';
+    if (error.response?.status === 400) {
+      errorMessage += 'Bad request - please try again.';
+    } else if (error.response?.status === 401) {
+      errorMessage += 'Please log in again.';
+    } else if (error.response?.status === 500) {
+      errorMessage += 'Server error. Please try again later.';
+    } else {
+      errorMessage += 'Please check your connection.';
+    }
+    
+    Alert.alert('Error', errorMessage);
+    setAvailableUsers([]);
+  } finally {
+    setLoadingUsers(false);
+  }
+};
+
+  const handleMemberSearch = (query) => {
+    setMemberSearchQuery(query);
+    if (query.trim().length < 2) {
+      setFilteredUsers([]);
+      setShowMemberDropdown(false);
+      return;
+    }
+    const searchTerm = query.toLowerCase();
+    const filtered = availableUsers.filter(
+      user =>
+        user.name.toLowerCase().includes(searchTerm) ||
+        user.email.toLowerCase().includes(searchTerm)
+    );
+    setFilteredUsers(filtered);
+    setShowMemberDropdown(true);
+  };
+
+  const addMember = (user) => {
+    if (!invitedMembers.some(member => member.id === user.id)) {
+      setInvitedMembers([...invitedMembers, user]);
+    }
+    setMemberSearchQuery('');
+    setFilteredUsers([]);
+    setShowMemberDropdown(false);
+  };
+
+  const removeMember = (userId) => {
+    setInvitedMembers(invitedMembers.filter(member => member.id !== userId));
+  };
+
   const handleCreateConference = async () => {
     // Validate basic fields - UPDATED: Only title is required
     if (!title) {
@@ -358,29 +438,56 @@ const handleTimeChange = (dayIndex, timeType, event, selectedTime) => {
 
     try {
       setIsSubmitting(true);
-      const result = await eventService.createEvent(newEvent);
 
-      if (selectedPharmaIds.length > 0) {
-        try {
-          await eventService.sendSponsorshipRequests(
-            result.event.id,
-            selectedPharmaIds,
-          );
-          console.log('Sponsorship requests sent successfully');
-        } catch (sponsorError) {
-          console.error('Error sending sponsorship requests:', sponsorError);
+      if (isPrivateEvent) {
+        // CREATE PRIVATE MEETING
+        const privateMeetingData = {
+          title,
+          description: description || '',
+          organizerName: user?.name || 'Event Organizer',
+          startDate: new Date(eventDays[0].date).toISOString(),
+          endDate: new Date(eventDays[eventDays.length - 1].date).toISOString(),
+          startTime: formatTime(eventDays[0].startTime),
+          endTime: formatTime(eventDays[eventDays.length - 1].endTime),
+          venue: venue || eventDays[0]?.venue || 'TBD',
+          mode: conferenceMode === 'Virtual' ? 'Virtual' : 'In-Person',
+          meetingLink: conferenceMode === 'Virtual' ? website : null,
+          invitedMembers: invitedMembers, // Use invitedMembers instead of invitedDoctors
+        };
+
+        console.log('Creating private meeting:', privateMeetingData);
+        const result = await userService.createPrivateMeeting(privateMeetingData);
+
+        Alert.alert(
+          'Success',
+          'Your private meeting has been created successfully! Invited members have been notified.',
+          [{text: 'OK', onPress: () => navigation.goBack()}],
+        );
+      } else {
+        const result = await eventService.createEvent(newEvent);
+
+        if (selectedPharmaIds.length > 0) {
+          try {
+            await eventService.sendSponsorshipRequests(
+              result.event.id,
+              selectedPharmaIds,
+            );
+            console.log('Sponsorship requests sent successfully');
+          } catch (sponsorError) {
+            console.error('Error sending sponsorship requests:', sponsorError);
+          }
         }
-      }
 
-      Alert.alert(
-        'Success',
-        result.requiresApproval
-          ? 'Your event has been submitted for approval. You will be notified once it is reviewed.'
-          : 'Your event has been created successfully!',
-        [{text: 'OK', onPress: () => navigation.goBack()}],
-      );
+        Alert.alert(
+          'Success',
+          result.requiresApproval
+            ? 'Your event has been submitted for approval. You will be notified once it is reviewed.'
+            : 'Your event has been created successfully!',
+          [{text: 'OK', onPress: () => navigation.goBack()}],
+        );
+      }
     } catch (error) {
-      console.log('Error creating event:', error);
+      console.log('Error creating event/meeting:', error);
       Alert.alert(
         'Error',
         error.message || 'Failed to create event. Please try again.',
@@ -512,6 +619,137 @@ const handleTimeChange = (dayIndex, timeType, event, selectedTime) => {
 
       <ScrollView style={styles.scrollView}>
         <View style={styles.formContainer}>
+          {/* Event Visibility Toggle - Available for ALL users, not just admin */}
+          <Text style={styles.sectionTitle}>Event Visibility</Text>
+          <View style={styles.toggleSection}>
+            <View style={styles.toggleContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.visibilityButton,
+                  !isPrivateEvent && styles.visibilityButtonActive,
+                ]}
+                onPress={() => {
+                  setIsPrivateEvent(false);
+                  setInvitedMembers([]);
+                  setMemberSearchQuery('');
+                  setShowMemberDropdown(false);
+                }}>
+                <Icon
+                  name="earth"
+                  size={18}
+                  color={!isPrivateEvent ? '#fff' : '#666'}
+                />
+                <Text
+                  style={[
+                    styles.visibilityButtonText,
+                    !isPrivateEvent && styles.visibilityButtonTextActive,
+                  ]}>
+                  Public Event
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.visibilityButton,
+                  isPrivateEvent && styles.visibilityButtonActive,
+                ]}
+                onPress={() => setIsPrivateEvent(true)}>
+                <Icon
+                  name="lock"
+                  size={18}
+                  color={isPrivateEvent ? '#fff' : '#666'}
+                />
+                <Text
+                  style={[
+                    styles.visibilityButtonText,
+                    isPrivateEvent && styles.visibilityButtonTextActive,
+                  ]}>
+                  Private Event
+                </Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.visibilityDescription}>
+              {isPrivateEvent 
+                ? 'Only invited members will be able to see and register for this event'
+                : 'You can invite specific members or make it available to everyone'
+              }
+            </Text>
+          </View>
+
+          {/* Member Invitation Section - Show for both private and public events */}
+          {(isPrivateEvent || (!isPrivateEvent && user?.role !== 'admin')) && (
+            <>
+              <Text style={styles.sectionTitle}>
+                {isPrivateEvent ? 'Invite Members' : 'Invite Specific Members (Optional)'}
+              </Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Search and Add Members*</Text>
+                <View style={styles.searchContainer}>
+                  <View style={styles.searchInputContainer}>
+                    <Icon name="account-search" size={20} color="#666" style={styles.searchIcon} />
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="Search users by name or email (min 2 characters)..."
+                      placeholderTextColor="#999"
+                      value={memberSearchQuery}
+                      onChangeText={handleMemberSearch}
+                      onFocus={() => memberSearchQuery.trim().length >= 2 && setShowMemberDropdown(true)}
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                    />
+                    {memberSearchQuery.length > 0 && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          setMemberSearchQuery('');
+                          setFilteredUsers([]);
+                          setShowMemberDropdown(false);
+                        }}
+                        style={styles.clearSearchButton}>
+                        <Icon name="close-circle" size={18} color="#888" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {showMemberDropdown && memberSearchQuery.trim().length >= 2 && (
+                    <View style={styles.searchDropdown}>
+                      {filteredUsers.length > 0 ? (
+                        filteredUsers.map(user => (
+                          <TouchableOpacity
+                            key={user.id}
+                            style={styles.searchResultItem}
+                            onPress={() => addMember(user)}
+                          >
+                            <Text style={styles.searchResultText}>{user.name} ({user.email})</Text>
+                          </TouchableOpacity>
+                        ))
+                      ) : (
+                        <Text style={styles.noResultsText}>No users found</Text>
+                      )}
+                    </View>
+                  )}
+                </View>
+              </View>
+              {/* Invited Members */}
+              {invitedMembers.length > 0 && (
+                <View style={styles.invitedMembersContainer}>
+                  <Text style={styles.invitedMembersTitle}>
+                    Invited Members ({invitedMembers.length})
+                  </Text>
+                  <View style={styles.membersList}>
+                    {invitedMembers.map(member => (
+                      <View key={member.id} style={styles.memberChip}>
+                        <Text>{member.name} ({member.email})</Text>
+                        <TouchableOpacity onPress={() => removeMember(member.id)}>
+                          <Icon name="close" size={16} color="#666" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+
           {/* Conference Type Selection */}
           <Text style={styles.sectionTitle}>Event Type</Text>
           <View style={styles.radioContainer}>
@@ -984,7 +1222,9 @@ const handleTimeChange = (dayIndex, timeType, event, selectedTime) => {
             {isSubmitting ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.createButtonText}>Create Event</Text>
+              <Text style={styles.createButtonText}>
+                {isPrivateEvent ? 'Create Private Meeting' : 'Create Event'}
+              </Text>
             )}
           </TouchableOpacity>
         </View>
@@ -1224,33 +1464,6 @@ const styles = StyleSheet.create({
     padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
-    alignItems: 'center',
-  },
-  listItemContent: {
-    flex: 1,
-  },
-  listItemTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  listItemSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
-  },
-  listItemDescription: {
-    fontSize: 14,
-    color: '#888',
-    marginTop: 4,
-  },
-  createButton: {
-    backgroundColor: '#2e7af5',
-    borderRadius: 8,
-    paddingVertical: 16,
-    marginTop: 32,
-    marginBottom: 32,
-    alignItems: 'center',
   },
   createButtonText: {
     color: 'white',
@@ -1377,6 +1590,63 @@ const styles = StyleSheet.create({
     color: '#333',
     marginLeft: 8,
     flex: 1,
+  },
+  toggleSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 8,
+    marginBottom: 16,
+  },
+  visibilityButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  visibilityButtonActive: {
+    backgroundColor: '#2e7af5',
+  },
+  visibilityButtonText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  visibilityButtonTextActive: {
+    color: 'white',
+    fontWeight: '500',
+  },
+  invitedMembersContainer: {
+    backgroundColor: '#f0f8ff',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  invitedMembersTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  membersList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  memberChip: {
+    backgroundColor: '#e1f5fe',
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+    marginBottom: 8,
   },
 });
 
