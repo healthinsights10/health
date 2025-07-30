@@ -23,6 +23,7 @@ const EventRegistrationsScreen = ({route, navigation}) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all'); // 'all', 'doctors', 'pharma'
+  const [exporting, setExporting] = useState(false);
   const insets = useSafeAreaInsets();
   useEffect(() => {
     fetchEventDetails();
@@ -111,14 +112,51 @@ const EventRegistrationsScreen = ({route, navigation}) => {
 
   const handleExportRegistrations = async () => {
     try {
+      setExporting(true); // Add this state if you don't have it
+      console.log('📧 Starting export process...');
+      
       const result = await adminService.exportEventRegistrations(eventId);
+      
+      console.log('✅ Export successful:', result);
+      
       Alert.alert(
-        'Success',
-        'Registration data has been exported and emailed to you',
+        'Export Successful! 📧', 
+        `Registration data for ${result.count} attendees has been sent to ${result.sentTo}.\n\nFile: ${result.filename}\n\nPlease check your email inbox (and spam folder if needed).`,
+        [
+          {
+            text: 'OK',
+            onPress: () => console.log('✅ Export email notification acknowledged')
+          }
+        ]
       );
     } catch (error) {
-      console.error('Failed to export registrations:', error);
-      Alert.alert('Error', 'Failed to export registration data');
+      console.error('❌ Export failed:', error);
+      
+      let errorMessage = 'Failed to export registration data. Please try again.';
+      if (error.response?.status === 404) {
+        errorMessage = 'Event not found or no registrations available.';
+      } else if (error.message.includes('Network')) {
+        errorMessage = 'Network error. Please check your connection.';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Server error. Please contact support if this persists.';
+      }
+
+      Alert.alert(
+        'Export Failed', 
+        errorMessage,
+        [
+          {
+            text: 'Retry',
+            onPress: handleExportRegistrations
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          }
+        ]
+      );
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -361,10 +399,20 @@ const EventRegistrationsScreen = ({route, navigation}) => {
 
       <View style={styles.actionButtons}>
         <TouchableOpacity
-          style={styles.exportButton}
-          onPress={handleExportRegistrations}>
-          <Icon name="file-export" size={18} color="#2e7af5" />
-          <Text style={styles.exportButtonText}>Export Data</Text>
+          style={[styles.exportButton, exporting && styles.exportButtonDisabled]}
+          onPress={handleExportRegistrations}
+          disabled={exporting}>
+          {exporting ? (
+            <>
+              <ActivityIndicator size="small" color="#2e7af5" />
+              <Text style={[styles.exportButtonText, {marginLeft: 8}]}>Sending Email...</Text>
+            </>
+          ) : (
+            <>
+              <Icon name="email-send" size={18} color="#2e7af5" />
+              <Text style={styles.exportButtonText}>Email Export</Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -540,6 +588,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#d0e1ff',
+  },
+  exportButtonDisabled: {
+    opacity: 0.6,
+    backgroundColor: '#f5f5f5',
   },
   exportButtonText: {
     fontSize: 14,

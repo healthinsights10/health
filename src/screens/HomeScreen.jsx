@@ -295,60 +295,52 @@ const HomeScreen = ({navigation}) => {
 
   // Optimized marked dates generation
   const generateMarkedDates = useCallback((allEvents) => {
-    const marks = {};
-    const colors = {
-      myEvents: '#2e7af5',
-      ongoingEvents: '#4CAF50',
-      registeredEvents: '#FF9800'
-    };
+  const marks = {};
+  const colors = {
+    myEvents: '#2e7af5',
+    ongoingEvents: '#4CAF50',
+    registeredEvents: '#FF9800'
+  };
 
-    Object.keys(allEvents).forEach(category => {
-      const eventsArray = allEvents[category];
-      const color = colors[category];
+  Object.keys(allEvents).forEach(category => {
+    const eventsArray = allEvents[category];
+    const color = colors[category];
 
-      eventsArray.forEach(event => {
-        if (!event.startDate || !event.endDate) return;
+    eventsArray.forEach(event => {
+      if (!event.startDate || !event.endDate) return;
 
-        try {
-          const startParts = event.startDate.split('T')[0].split('-');
-          const endParts = event.endDate.split('T')[0].split('-');
+      try {
+        // Always parse as UTC and set to midnight to avoid timezone drift
+        const startDate = new Date(event.startDate.split('T')[0] + 'T00:00:00Z');
+        const endDate = new Date(event.endDate.split('T')[0] + 'T00:00:00Z');
 
-          const start = new Date(
-            parseInt(startParts[0]),
-            parseInt(startParts[1]) - 1,
-            parseInt(startParts[2]),
-          );
+        // Calculate number of days between start and end (inclusive)
+        const daysDiff = Math.round((endDate - startDate) / (1000 * 60 * 60 * 24));
 
-          const end = new Date(
-            parseInt(endParts[0]),
-            parseInt(endParts[1]) - 1,
-            parseInt(endParts[2]),
-          );
+        for (let i = 0; i <= daysDiff; i++) {
+          const currentDate = new Date(startDate);
+          currentDate.setUTCDate(startDate.getUTCDate() + i);
+          const dateString = currentDate.toISOString().split('T')[0];
 
-          const currentDate = new Date(start);
-          while (currentDate <= end) {
-            const dateString = currentDate.toISOString().split('T')[0];
-
-            if (!marks[dateString]) {
-              marks[dateString] = {
-                dots: [{ color, key: category }],
-                selected: true,
-                selectedColor: color
-              };
-            } else if (!marks[dateString].dots.some(dot => dot.color === color)) {
-              marks[dateString].dots.push({ color, key: category });
-            }
-
-            currentDate.setDate(currentDate.getDate() + 1);
+          if (!marks[dateString]) {
+            marks[dateString] = {
+              dots: [{ color, key: category }],
+              selected: true,
+              selectedColor: color
+            };
+          } else if (!marks[dateString].dots.some(dot => dot.color === color)) {
+            marks[dateString].dots.push({ color, key: category });
           }
-        } catch (error) {
-          console.error('Error processing event date:', error);
         }
-      });
+      } catch (error) {
+        console.error('Error processing event date:', error);
+      }
     });
+  });
 
-    return marks;
-  }, []);
+  return marks;
+}, []);
+
 
   // Memoized renderEventItem
   const renderEventItem = useCallback(({item}) => (

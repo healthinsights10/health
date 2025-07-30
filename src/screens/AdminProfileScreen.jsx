@@ -165,7 +165,7 @@ const AdminProfileScreen = ({navigation}) => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.supportSection}>
+        {/* <View style={styles.supportSection}>
           <Text style={styles.sectionTitle}>Support</Text>
 
           <TouchableOpacity
@@ -206,7 +206,7 @@ const AdminProfileScreen = ({navigation}) => {
             <Text style={styles.actionText}>About MedEvent</Text>
             <Icon name="chevron-right" size={22} color="#ccc" />
           </TouchableOpacity>
-        </View>
+        </View> */}
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Icon name="logout" size={20} color="#fff" />

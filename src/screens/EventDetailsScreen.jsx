@@ -589,19 +589,22 @@ const EventDetailsScreen = ({route, navigation}) => {
                   </TouchableOpacity>
                 ))}
 
-              <TouchableOpacity
-                style={[styles.secondaryButton, {backgroundColor: '#ff85be'}]}
-                onPress={() =>
-                  navigation.navigate('Quiz', {
-                    eventId: event.id,
-                    eventTitle: event.title,
-                  })
-                }>
-                <Icon name="help-circle" size={18} color="#fff" />
-                <Text style={[styles.secondaryButtonText, {color: '#fff'}]}>
-                  Take Quiz
-                </Text>
-              </TouchableOpacity>
+              {/* Take Quiz button - Only show for doctors */}
+              {user?.role === 'doctor' && (
+                <TouchableOpacity
+                  style={[styles.secondaryButton, {backgroundColor: '#ff85be'}]}
+                  onPress={() =>
+                    navigation.navigate('Quiz', {
+                      eventId: event.id,
+                      eventTitle: event.title,
+                    })
+                  }>
+                  <Icon name="help-circle" size={18} color="#fff" />
+                  <Text style={[styles.secondaryButtonText, {color: '#fff'}]}>
+                    Take Quiz
+                  </Text>
+                </TouchableOpacity>
+              )}
             </>
           )}
         </View>

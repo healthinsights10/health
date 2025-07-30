@@ -63,7 +63,7 @@ const MeetingInvitationsScreen = ({navigation}) => {
   };
 
   const handleViewMeeting = meetingId => {
-    navigation.navigate('MeetingDetails', {meetingId});
+    navigation.navigate('PrivateMeetingDetails', {meetingId});
   };
 
   const handleAcceptInvitation = async meetingId => {
